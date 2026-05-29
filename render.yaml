@@ -3,20 +3,24 @@ services:
     name: aiops-server
     runtime: python
     plan: free
-    buildCommand: pip install -e .
+    buildCommand: pip install .
     startCommand: uvicorn aiops_server.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
+      # --- Set these manually in the Render dashboard (marked sync: false) ---
       - key: DATABASE_URL
-        sync: false          # set this manually in Render dashboard
+        sync: false
       - key: ADMIN_PASSWORD_HASH
-        sync: false          # set this manually in Render dashboard
+        sync: false
       - key: SESSION_SECRET
-        sync: false          # set this manually in Render dashboard
+        sync: false
       - key: SMTP_USER
-        sync: false          # set this manually in Render dashboard
+        sync: false
       - key: SMTP_PASSWORD
-        sync: false          # set this manually in Render dashboard
+        sync: false
+      # --- These are safe to store in the file ---
       - key: ADMIN_EMAIL
         value: khushi.shimpi@elliotsystems.com
       - key: COOKIE_SECURE
-        value: "true"        # enforces HTTPS-only cookies on Render
+        value: "true"
