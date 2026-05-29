@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: aiops-server
+    runtime: python
+    plan: free
+    buildCommand: pip install -e .
+    startCommand: uvicorn aiops_server.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # set this manually in Render dashboard
+      - key: ADMIN_PASSWORD_HASH
+        sync: false          # set this manually in Render dashboard
+      - key: SESSION_SECRET
+        sync: false          # set this manually in Render dashboard
+      - key: SMTP_USER
+        sync: false          # set this manually in Render dashboard
+      - key: SMTP_PASSWORD
+        sync: false          # set this manually in Render dashboard
+      - key: ADMIN_EMAIL
+        value: khushi.shimpi@elliotsystems.com
+      - key: COOKIE_SECURE
+        value: "true"        # enforces HTTPS-only cookies on Render
