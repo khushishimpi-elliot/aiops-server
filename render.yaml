@@ -3,8 +3,8 @@ services:
     name: aiops-server
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.aiops_server.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: poetry install --no-interaction
+    startCommand: uvicorn aiops_server.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeploy: true
     envVars:
