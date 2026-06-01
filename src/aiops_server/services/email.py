@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -30,5 +31,13 @@ def _send_sync(config: Config, to: str, code: str) -> None:
         server.sendmail(config.smtp_user, to, msg.as_string())
 
 
-async def send_otp_email(config: Config, to: str, code: str) -> None:
-    await asyncio.to_thread(_send_sync, config, to, code)
+async def send_otp_email(config: Config, to: str, code: str) -> bool:
+    if not config.email_configured:
+        logging.warning("SMTP not configured — skipping email send")
+        return False
+    try:
+        await asyncio.to_thread(_send_sync, config, to, code)
+        return True
+    except Exception as e:
+        logging.error(f"Email send failed: {e}")
+        return False

@@ -18,8 +18,15 @@ from .routers import admin, enrollment, health, query, telemetry
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    import logging
     config = get_config()
     await init_pool(config)
+    if not config.email_configured:
+        logging.warning(
+            "EMAIL NOT CONFIGURED: Set SMTP_USER and SMTP_PASSWORD in Render environment variables. "
+            "OTPs will be logged to console instead."
+        )
+    logging.info("AIOps server started")
     yield
     await close_pool()
 

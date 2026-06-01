@@ -59,9 +59,16 @@ async def send_otp(
     if not await otp_svc.within_rate_limit(conn, email):
         raise AppError(429, "otp_rate_limit_exceeded", "Max 3 OTPs per hour.")
 
+    import logging
+
     ip = request.client.host if request.client else None
     code, _ = await otp_svc.create_otp(conn, email, ip)
-    await send_otp_email(config, email, code)
+
+    email_sent = await send_otp_email(config, email, code)
+
+    if not email_sent:
+        logging.warning(f"OTP for {email}: {code}")
+        logging.warning("EMAIL DELIVERY FAILED — check SMTP_USER and SMTP_PASSWORD in Render env vars")
 
     return SendOtpResponse(expires_in_seconds=600)
 
