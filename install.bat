@@ -1,26 +1,31 @@
 @echo off
-title Elliot Systems AIOps Install
+setlocal enabledelayedexpansion
+title Elliot Systems AIOps Setup
+
 echo.
 echo  ================================================
 echo   Elliot Systems AIOps - Developer Setup
 echo  ================================================
 echo.
 
-:: Check Python is installed
+set SERVER=https://aiops-server.onrender.com
+
 python --version >nul 2>&1
-if errorlevel 1 (
-    echo  ERROR: Python is not installed or not in PATH.
-    echo  Download it from https://www.python.org/downloads/
-    echo.
+if %errorlevel% neq 0 (
+    echo  ERROR: Python is not installed.
+    echo  Download from https://www.python.org/downloads/
+    echo  Check "Add Python to PATH" during install.
     pause
     exit /b 1
 )
+echo  Python found.
 
-:: Run the install command with the server URL hardcoded
-python "%~dp0aiops.py" install --server http://10.179.21.117:8000
+echo  Installing SSL certificates...
+python -m pip install --quiet --upgrade certifi 2>nul
+echo  SSL ready.
 
-if errorlevel 1 (
-    echo.
-    echo  Something went wrong. Contact your IT admin.
-    pause
-)
+echo.
+python "%~dp0aiops.py" install --server %SERVER%
+
+echo.
+pause

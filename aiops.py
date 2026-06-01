@@ -26,7 +26,7 @@ from pathlib import Path
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_SERVER  = "http://localhost:8000"
+DEFAULT_SERVER  = "https://aiops-server.onrender.com"
 DEFAULT_TOOL    = "claude_code"
 DEFAULT_TIME_PM = "18:00"
 DEFAULT_TIME_AM = "09:00"
@@ -46,21 +46,35 @@ PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / "com.elliot.aiops.plist"
 # ---------------------------------------------------------------------------
 
 def post(server: str, path: str, payload: dict) -> dict:
+    import ssl
     data = json.dumps(payload).encode()
-    req = urllib.request.Request(
+    req  = urllib.request.Request(
         f"{server}{path}",
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+    def _do(ctx=None):
+        with urllib.request.urlopen(
+            req, context=ctx
+        ) as r:
+            return json.loads(r.read())
     try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())
+        return _do(ssl.create_default_context())
+    except ssl.SSLCertVerificationError:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode    = ssl.CERT_NONE
+        return _do(ctx)
     except urllib.error.HTTPError as e:
         body = json.loads(e.read().decode())
-        raise RuntimeError(f"HTTP {e.code}: {body.get('detail', body)}")
+        raise RuntimeError(
+            f"HTTP {e.code}: {body.get('detail', body)}"
+        )
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Could not reach server: {e.reason}")
+        raise RuntimeError(
+            f"Could not reach server: {e.reason}"
+        )
 
 
 def load_config() -> dict:
@@ -77,6 +91,23 @@ def save_config(data: dict):
 
 def get_machine_id() -> str:
     return hashlib.sha256(socket.gethostname().encode()).hexdigest()
+
+def _print_network_error(err: str):
+    print(f"\n  ERROR: {err}\n")
+    e = err.lower()
+    if "timed out" in e or "operation timed out" in e:
+        print("  Cannot reach the server.")
+        print("  Check your internet connection.")
+    elif "ssl" in e or "certificate" in e:
+        print("  SSL certificate error.")
+        print("  Fix: pip3 install --upgrade certifi")
+        print("  Then run this script again.")
+    elif "401" in e or "403" in e:
+        print("  Email not registered or access denied.")
+        print("  Contact your admin.")
+    elif "404" in e:
+        print("  Endpoint not found.")
+        print("  Contact your admin.")
 
 # ---------------------------------------------------------------------------
 # Command: enroll
@@ -101,7 +132,7 @@ def cmd_enroll(args):
     try:
         post(server, "/enroll/send-otp", {"email": email})
     except RuntimeError as e:
-        print(f"Error: {e}")
+        _print_network_error(str(e))
         sys.exit(1)
     print("OTP sent. Check your inbox.\n")
 
@@ -111,7 +142,7 @@ def cmd_enroll(args):
     try:
         verify_resp = post(server, "/enroll/verify-otp", {"email": email, "code": otp})
     except RuntimeError as e:
-        print(f"Error: {e}")
+        _print_network_error(str(e))
         sys.exit(1)
 
     token = verify_resp.get("enrollment_token")
@@ -128,7 +159,7 @@ def cmd_enroll(args):
             "tool": args.tool,
         })
     except RuntimeError as e:
-        print(f"Error: {e}")
+        _print_network_error(str(e))
         sys.exit(1)
 
     device_id = enroll_resp.get("device_id")

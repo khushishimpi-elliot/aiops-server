@@ -271,14 +271,29 @@ export default function DeveloperList() {
   const [search, setSearch] = useState('')
   const [drawerEmail, setDrawerEmail] = useState<string | null>(null)
   const [drawerColorIdx, setDrawerColorIdx] = useState(0)
+  const [lastUpdated, setLastUpdated] = useState('')
 
-  useEffect(() => {
+  function fetchDevelopers() {
     setDevelopers(null)
     setError('')
     api.developers(days)
-      .then(r => setDevelopers(r.developers))
+      .then(r => {
+        setDevelopers(r.developers)
+        setLastUpdated(new Date().toLocaleTimeString())
+      })
       .catch(e => setError(e.message))
+  }
+
+  useEffect(() => {
+    fetchDevelopers()
   }, [days])
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchDevelopers()
+    }, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const closeDrawer = useCallback(() => setDrawerEmail(null), [])
 
@@ -292,7 +307,18 @@ export default function DeveloperList() {
       <div className="topbar">
         <div>
           <div className="topbar-kicker">Elliot Systems</div>
-          <div className="topbar-title">Developers</div>
+          <div className="topbar-title">
+            Developers
+            {lastUpdated && (
+              <span style={{
+                fontSize: '11px',
+                color: '#9ca3af',
+                marginLeft: '12px',
+              }}>
+                Last updated {lastUpdated}
+              </span>
+            )}
+          </div>
         </div>
         <select
           className="period-select"

@@ -26,14 +26,37 @@ export default function Layout() {
     <div className="layout">
       <nav className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-mark">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-          </div>
-          <span className="sidebar-brand-text">
-            Ai<span className="orange">Ops</span>
-          </span>
+          <svg
+            viewBox="0 0 260 60"
+            style={{ display: 'block', width: '90px', height: 'auto' }}
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M0 0 L36 0 L36 10 L12 10 L12 22 L30 22
+                 L30 32 L12 32 L12 50 L36 50 L36 60 L0 60 Z"
+              fill="#000000"
+            />
+            <polygon points="14,14 14,46 34,30" fill="#FF6600"/>
+            <path
+              d="M44 0 L56 0 L56 50 L78 50 L78 60 L44 60 Z"
+              fill="#000000"
+            />
+            <path
+              d="M86 0 L98 0 L98 50 L120 50 L120 60 L86 60 Z"
+              fill="#000000"
+            />
+            <rect x="128" y="0" width="12" height="60" fill="#000000"/>
+            <path
+              d="M150 0 L184 0 L184 60 L150 60 Z
+                 M162 12 L162 48 L172 48 L172 12 Z"
+              fill="#000000"
+            />
+            <path
+              d="M194 0 L240 0 L240 12 L223 12
+                 L223 60 L211 60 L211 12 L194 12 Z"
+              fill="#000000"
+            />
+          </svg>
         </div>
 
         <div className="sidebar-nav">

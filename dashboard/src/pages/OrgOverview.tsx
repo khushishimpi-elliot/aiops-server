@@ -21,8 +21,9 @@ export default function OrgOverview() {
   const [data, setData] = useState<OrgOverviewResponse | null>(null)
   const [devs, setDevs] = useState<DevSummaryItem[] | null>(null)
   const [error, setError] = useState('')
+  const [lastUpdated, setLastUpdated] = useState('')
 
-  useEffect(() => {
+  function fetchData() {
     setData(null)
     setDevs(null)
     setError('')
@@ -32,8 +33,20 @@ export default function OrgOverview() {
     ]).then(([orgData, devsData]) => {
       setData(orgData)
       setDevs(devsData.developers)
+      setLastUpdated(new Date().toLocaleTimeString())
     }).catch(e => setError(e.message))
+  }
+
+  useEffect(() => {
+    fetchData()
   }, [days])
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchData()
+    }, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Derive tool totals from by_tool_model
   const toolTotals = data ? (() => {
@@ -78,7 +91,18 @@ export default function OrgOverview() {
       <div className="topbar">
         <div>
           <div className="topbar-kicker">Elliot Systems</div>
-          <div className="topbar-title">Organization Overview</div>
+          <div className="topbar-title">
+            Organization Overview
+            {lastUpdated && (
+              <span style={{
+                fontSize: '11px',
+                color: '#9ca3af',
+                marginLeft: '12px',
+              }}>
+                Last updated {lastUpdated}
+              </span>
+            )}
+          </div>
         </div>
         <select
           className="period-select"
