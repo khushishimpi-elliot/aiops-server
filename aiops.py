@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 import urllib.error
@@ -346,80 +347,73 @@ def parse_copilot_logs(target_date: str) -> dict:
         "input_tokens": 0, "output_tokens": 0,
         "cache_read_tokens": 0, "cache_write_tokens": 0,
     })
-
+    home = Path.home()
     if sys.platform == "win32":
-        appdata = Path(os.environ.get("APPDATA", ""))
-        possible_paths = [
-            appdata / "Code" / "User" / "globalStorage" / "github.copilot-chat" / "chatSessions",
-            appdata / "Code - Insiders" / "User" / "globalStorage" / "github.copilot-chat" / "chatSessions",
+        base_paths = [
+            Path(os.environ.get("APPDATA", "")) / "Code" / "User" / "globalStorage" / "github.copilot-chat",
+            Path(os.environ.get("APPDATA", "")) / "Code - Insiders" / "User" / "globalStorage" / "github.copilot-chat",
         ]
     else:
-        home = Path.home()
-        possible_paths = [
-            home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "github.copilot-chat" / "chatSessions",
-            home / ".config" / "Code" / "User" / "globalStorage" / "github.copilot-chat" / "chatSessions",
+        base_paths = [
+            home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "github.copilot-chat",
+            home / ".config" / "Code" / "User" / "globalStorage" / "github.copilot-chat",
         ]
-
-    sessions_found = 0
-    for base_path in possible_paths:
-        if not base_path.exists():
+    sessions = 0
+    for base in base_paths:
+        if not base.exists():
             continue
-        for f in base_path.rglob("*.json"):
+        for f in base.rglob("*.json"):
             try:
                 mtime = datetime.date.fromtimestamp(f.stat().st_mtime).isoformat()
                 if mtime != target_date:
                     continue
-                json.loads(f.read_text(encoding="utf-8"))
-                sessions_found += 1
-                totals["copilot/auto"]["input_tokens"]  += 500
-                totals["copilot/auto"]["output_tokens"] += 250
+                sessions += 1
             except Exception:
                 continue
-
-    return dict(totals) if sessions_found > 0 else {}
+    if sessions > 0:
+        totals["copilot/auto"]["input_tokens"]  = sessions * 500
+        totals["copilot/auto"]["output_tokens"] = sessions * 250
+    return dict(totals) if sessions > 0 else {}
 
 
 def parse_cursor_logs(target_date: str) -> dict:
     """Read Cursor AI usage from SQLite storage."""
-    import sqlite3
     totals: dict = defaultdict(lambda: {
         "input_tokens": 0, "output_tokens": 0,
         "cache_read_tokens": 0, "cache_write_tokens": 0,
     })
-
+    home = Path.home()
     if sys.platform == "win32":
-        appdata = Path(os.environ.get("APPDATA", ""))
-        possible_paths = [appdata / "Cursor" / "User" / "globalStorage" / "state.vscdb"]
+        db_paths = [Path(os.environ.get("APPDATA", "")) / "Cursor" / "User" / "globalStorage" / "state.vscdb"]
     else:
-        home = Path.home()
-        possible_paths = [
+        db_paths = [
             home / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb",
             home / ".config" / "Cursor" / "User" / "globalStorage" / "state.vscdb",
         ]
-
-    for db_path in possible_paths:
+    for db_path in db_paths:
         if not db_path.exists():
             continue
         try:
-            conn = sqlite3.connect(str(db_path))
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM ItemTable WHERE key LIKE '%composer%' OR key LIKE '%chat%'")
-            rows = cursor.fetchall()
+            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            c = conn.cursor()
+            c.execute("SELECT value FROM ItemTable WHERE key LIKE '%composer%' OR key LIKE '%aichat%'")
+            rows = c.fetchall()
             conn.close()
             for row in rows:
                 try:
                     data = json.loads(row[0])
-                    if isinstance(data, dict):
-                        ts = data.get("timestamp", "")
-                        if str(ts).startswith(target_date):
-                            model = data.get("model", "gpt-4o")
-                            totals[model]["input_tokens"]  += data.get("inputTokens", 0)
-                            totals[model]["output_tokens"] += data.get("outputTokens", 0)
+                    if not isinstance(data, dict):
+                        continue
+                    ts = str(data.get("createdAt", data.get("timestamp", "")))
+                    if not ts.startswith(target_date):
+                        continue
+                    model = data.get("model", "gpt-4o")
+                    totals[model]["input_tokens"]  += data.get("inputTokens", data.get("promptTokens", 0))
+                    totals[model]["output_tokens"] += data.get("outputTokens", data.get("completionTokens", 0))
                 except Exception:
                     continue
         except Exception:
             continue
-
     return dict(totals)
 
 
@@ -429,81 +423,110 @@ def parse_gemini_logs(target_date: str) -> dict:
         "input_tokens": 0, "output_tokens": 0,
         "cache_read_tokens": 0, "cache_write_tokens": 0,
     })
-
+    home = Path.home()
     if sys.platform == "win32":
-        possible_paths = [
-            Path.home() / ".gemini" / "tmp",
-            Path(os.environ.get("APPDATA", "")) / "gemini" / "tmp",
-        ]
+        base_paths = [home / ".gemini" / "tmp", Path(os.environ.get("APPDATA", "")) / "gemini" / "tmp"]
     else:
-        possible_paths = [Path.home() / ".gemini" / "tmp"]
-
-    for base_path in possible_paths:
-        if not base_path.exists():
+        base_paths = [home / ".gemini" / "tmp"]
+    for base in base_paths:
+        if not base.exists():
             continue
-        for f in base_path.rglob("*.json"):
+        for f in base.rglob("*.json"):
             try:
                 mtime = datetime.date.fromtimestamp(f.stat().st_mtime).isoformat()
                 if mtime != target_date:
                     continue
                 data = json.loads(f.read_text(encoding="utf-8"))
-                if isinstance(data, list):
-                    for entry in data:
-                        if not isinstance(entry, dict):
-                            continue
-                        usage = entry.get("usageMetadata", {})
-                        if not usage:
-                            continue
-                        model = entry.get("model", "gemini-2.0-flash")
-                        totals[model]["input_tokens"]  += usage.get("promptTokenCount", 0)
-                        totals[model]["output_tokens"] += usage.get("candidatesTokenCount", 0)
+                entries = data if isinstance(data, list) else [data]
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    usage = entry.get("usageMetadata", {})
+                    if not usage:
+                        continue
+                    model = entry.get("model", "gemini-2.0-flash")
+                    totals[model]["input_tokens"]  += usage.get("promptTokenCount", 0)
+                    totals[model]["output_tokens"] += usage.get("candidatesTokenCount", 0)
             except Exception:
                 continue
-
     return dict(totals)
 
 
 def parse_windsurf_logs(target_date: str) -> dict:
     """Read Windsurf AI usage from storage."""
-    import sqlite3
     totals: dict = defaultdict(lambda: {
         "input_tokens": 0, "output_tokens": 0,
         "cache_read_tokens": 0, "cache_write_tokens": 0,
     })
-
+    home = Path.home()
     if sys.platform == "win32":
-        appdata = Path(os.environ.get("APPDATA", ""))
-        possible_paths = [appdata / "Windsurf" / "User" / "globalStorage" / "state.vscdb"]
+        db_paths = [Path(os.environ.get("APPDATA", "")) / "Windsurf" / "User" / "globalStorage" / "state.vscdb"]
     else:
-        home = Path.home()
-        possible_paths = [
+        db_paths = [
             home / "Library" / "Application Support" / "Windsurf" / "User" / "globalStorage" / "state.vscdb",
             home / ".config" / "Windsurf" / "User" / "globalStorage" / "state.vscdb",
         ]
-
-    for db_path in possible_paths:
+    for db_path in db_paths:
         if not db_path.exists():
             continue
         try:
-            conn = sqlite3.connect(str(db_path))
+            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
             c = conn.cursor()
-            c.execute("SELECT value FROM ItemTable WHERE key LIKE '%chat%'")
+            c.execute("SELECT value FROM ItemTable WHERE key LIKE '%chat%' OR key LIKE '%cascade%'")
             rows = c.fetchall()
             conn.close()
             for row in rows:
                 try:
                     data = json.loads(row[0])
-                    if isinstance(data, dict):
-                        ts = data.get("timestamp", "")
-                        if str(ts).startswith(target_date):
-                            model = data.get("model", "windsurf")
-                            totals[model]["input_tokens"]  += data.get("inputTokens", 100)
-                            totals[model]["output_tokens"] += data.get("outputTokens", 50)
+                    if not isinstance(data, dict):
+                        continue
+                    ts = str(data.get("timestamp", ""))
+                    if not ts.startswith(target_date):
+                        continue
+                    model = data.get("model", "windsurf")
+                    totals[model]["input_tokens"]  += data.get("inputTokens", 100)
+                    totals[model]["output_tokens"] += data.get("outputTokens", 50)
                 except Exception:
                     continue
         except Exception:
             continue
+    return dict(totals)
 
+
+def parse_cline_logs(target_date: str) -> dict:
+    """Read Cline (Claude Dev) usage from VSCode storage."""
+    totals: dict = defaultdict(lambda: {
+        "input_tokens": 0, "output_tokens": 0,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+    })
+    home = Path.home()
+    if sys.platform == "win32":
+        base_paths = [
+            Path(os.environ.get("APPDATA", "")) / "Code" / "User" / "globalStorage" / "saoudrizwan.claude-dev" / "tasks",
+        ]
+    else:
+        base_paths = [
+            home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "saoudrizwan.claude-dev" / "tasks",
+            home / ".config" / "Code" / "User" / "globalStorage" / "saoudrizwan.claude-dev" / "tasks",
+        ]
+    for base in base_paths:
+        if not base.exists():
+            continue
+        for f in base.rglob("*.json"):
+            try:
+                mtime = datetime.date.fromtimestamp(f.stat().st_mtime).isoformat()
+                if mtime != target_date:
+                    continue
+                data = json.loads(f.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    continue
+                model = data.get("model", "claude-sonnet-4-5")
+                totals[model]["input_tokens"]       += data.get("tokensIn", 0)
+                totals[model]["output_tokens"]      += data.get("tokensOut", 0)
+                totals[model]["cache_read_tokens"]  += data.get("cacheReads", 0)
+                totals[model]["cache_write_tokens"] += data.get("cacheWrites", 0)
+            except Exception:
+                continue
     return dict(totals)
 
 
@@ -544,7 +567,7 @@ def cmd_report(args):
 
     if target:
         # ── Single date: scan ALL tools ──────────────────────────────────
-        print(f"Scanning all AI tool logs for {target}...\n")
+        print(f"Scanning all AI tool logs...\n")
 
         tool_scanners = [
             ("claude_code", _parse_claude_for_date),
@@ -552,6 +575,7 @@ def cmd_report(args):
             ("cursor",      parse_cursor_logs),
             ("gemini",      parse_gemini_logs),
             ("windsurf",    parse_windsurf_logs),
+            ("cline",       parse_cline_logs),
         ]
 
         for tool_name, scanner in tool_scanners:
@@ -564,7 +588,7 @@ def cmd_report(args):
             if not usage_by_model:
                 continue
 
-            print(f"  {tool_name}:")
+            tool_submitted = 0
             for model, usage in usage_by_model.items():
                 if usage["input_tokens"] + usage["output_tokens"] == 0:
                     continue
@@ -584,22 +608,21 @@ def cmd_report(args):
                     "agent_version":      AGENT_VERSION,
                 }
                 try:
-                    resp = post(server, "/telemetry/daily-rollup", payload)
-                    print(
-                        f"    {model}: {usage['input_tokens']}in / "
-                        f"{usage['output_tokens']}out "
-                        f"→ usage_id={resp.get('usage_id', 'ok')}"
-                    )
+                    post(server, "/telemetry/daily-rollup", payload)
+                    tool_submitted += 1
                     submitted += 1
                 except RuntimeError as e:
                     err = str(e)
                     if "already_exists" in err or "duplicate" in err.lower():
                         skipped += 1
                     else:
-                        print(f"    {model}: ERROR — {e}")
+                        print(f"  {tool_name}/{model}: ERROR — {e}")
+
+            if tool_submitted > 0:
+                print(f"  ✓ {tool_name}: {tool_submitted} model(s) sent")
 
         if submitted == 0 and skipped == 0:
-            print("  No usage found for this date.")
+            print("No usage found for any tool today.")
         else:
             print(f"\nDone. {submitted} submitted, {skipped} already existed.")
 
