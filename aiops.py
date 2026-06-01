@@ -421,10 +421,13 @@ IS_WINDOWS = sys.platform == "win32"
 
 def task_exists() -> bool:
     if IS_WINDOWS:
-        r = subprocess.run(["schtasks", "/query", "/tn", TASK_NAME_AM], capture_output=True, check=False)
+        r = subprocess.run(
+            ["schtasks", "/query", "/tn", TASK_NAME],
+            capture_output=True, check=False
+        )
         return r.returncode == 0
     else:
-        return PLIST_AM.exists() or PLIST_PM.exists()
+        return PLIST_PATH.exists()
 
 
 def _remove_legacy(python_exe=None, script_path=None):
@@ -450,28 +453,41 @@ def cmd_setup(args):
 
 
 def _setup_windows(python_exe, script_path):
-    for task_name, time_str in [(TASK_NAME_AM, DEFAULT_TIME_AM), (TASK_NAME_PM, DEFAULT_TIME_PM)]:
-        # Remove existing task with this name first
-        subprocess.run(["schtasks", "/delete", "/tn", task_name, "/f"], capture_output=True, check=False)
+    # Remove existing tasks
+    for suffix in ['', '_2', '_3', '_4', '_5', '_6', '_7']:
+        subprocess.run(
+            ["schtasks", "/delete", "/tn", TASK_NAME + suffix, "/f"],
+            capture_output=True
+        )
 
+    # Create tasks for every 2 hours
+    times    = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"]
+    suffixes = ['', '_2', '_3', '_4', '_5', '_6', '_7']
+    cmd      = f'"{python_exe}" "{script_path}" report'
+
+    created = 0
+    for t, s in zip(times, suffixes):
         result = subprocess.run([
             "schtasks", "/create",
-            "/tn", task_name,
-            "/tr", f'"{python_exe}" "{script_path}" report',
+            "/tn", TASK_NAME + s,
+            "/tr", cmd,
             "/sc", "DAILY",
-            "/st", time_str,
-            "/rl", "HIGHEST",
+            "/st", t,
             "/f",
         ], capture_output=True, text=True)
-
         if result.returncode == 0:
-            print(f"Scheduled task '{task_name}' created — runs daily at {time_str}.")
-        else:
-            print(f"Failed to create task '{task_name}':\n{result.stderr}")
-            sys.exit(1)
+            created += 1
+
+    if created > 0:
+        print(f"Scheduler set up. Runs every 2 hours.")
+        print(f"  8am 10am 12pm 2pm 4pm 6pm 8pm")
+    else:
+        print(f"Failed to create scheduled tasks.")
+        print(f"Try running as Administrator.")
+        sys.exit(1)
 
 
-def _make_plist(python_exe: str, script_path: str, label: str, hour: int, minute: int, log_path: str) -> str:
+def _make_plist(python_exe: str, script_path: str, label: str, log_path: str) -> str:
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -485,12 +501,22 @@ def _make_plist(python_exe: str, script_path: str, label: str, hour: int, minute
         <string>report</string>
     </array>
     <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>{hour}</integer>
-        <key>Minute</key>
-        <integer>{minute}</integer>
-    </dict>
+    <array>
+        <dict><key>Hour</key><integer>8</integer>
+              <key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>10</integer>
+              <key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>12</integer>
+              <key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>14</integer>
+              <key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>16</integer>
+              <key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>18</integer>
+              <key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>20</integer>
+              <key>Minute</key><integer>0</integer></dict>
+    </array>
     <key>StandardOutPath</key>
     <string>{log_path}</string>
     <key>StandardErrorPath</key>
@@ -500,41 +526,50 @@ def _make_plist(python_exe: str, script_path: str, label: str, hour: int, minute
 
 
 def _setup_mac(python_exe, script_path):
-    PLIST_AM.parent.mkdir(parents=True, exist_ok=True)
+    PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     log_path = str(Path.home() / ".aiops" / "telemetry.log")
 
-    schedules = [
-        (PLIST_AM, "com.elliot.aiops.am", 9,  0),
-        (PLIST_PM, "com.elliot.aiops.pm", 18, 0),
-    ]
-    for plist_path, label, hour, minute in schedules:
-        if plist_path.exists():
-            subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True, check=False)
-        plist_path.write_text(_make_plist(python_exe, script_path, label, hour, minute, log_path))
-        subprocess.run(["launchctl", "load", str(plist_path)], capture_output=True, check=False)
-        print(f"Scheduled task '{label}' created — runs daily at {hour:02d}:{minute:02d}.")
+    # Remove old AM/PM plists if they exist
+    for old_plist in [PLIST_AM, PLIST_PM]:
+        if old_plist.exists():
+            subprocess.run(["launchctl", "unload", str(old_plist)], capture_output=True, check=False)
+            old_plist.unlink(missing_ok=True)
 
+    if PLIST_PATH.exists():
+        subprocess.run(["launchctl", "unload", str(PLIST_PATH)], capture_output=True, check=False)
+    PLIST_PATH.write_text(_make_plist(python_exe, script_path, "com.elliot.aiops", log_path))
+    subprocess.run(["launchctl", "load", str(PLIST_PATH)], capture_output=True, check=False)
+
+    print(f"Scheduler set up. Runs every 2 hours")
+    print(f"  8am 10am 12pm 2pm 4pm 6pm 8pm")
     print(f"Log file: {log_path}")
 
 
 def cmd_remove(_args):
-    removed = False
     if IS_WINDOWS:
-        for task_name in [TASK_NAME_AM, TASK_NAME_PM, TASK_NAME]:
-            r = subprocess.run(["schtasks", "/delete", "/tn", task_name, "/f"], capture_output=True, check=False)
+        removed = 0
+        for suffix in ['', '_2', '_3', '_4', '_5', '_6', '_7']:
+            r = subprocess.run(
+                ["schtasks", "/delete", "/tn", TASK_NAME + suffix, "/f"],
+                capture_output=True
+            )
             if r.returncode == 0:
-                print(f"Removed task: {task_name}")
-                removed = True
+                removed += 1
+        if removed > 0:
+            print(f"Scheduled tasks removed.")
+        else:
+            print(f"No tasks found.")
     else:
-        for plist_path in [PLIST_AM, PLIST_PM, PLIST_PATH]:
+        removed = False
+        for plist_path in [PLIST_PATH, PLIST_AM, PLIST_PM]:
             if plist_path.exists():
                 subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True, check=False)
                 plist_path.unlink(missing_ok=True)
-                print(f"Removed: {plist_path.name}")
                 removed = True
-
-    if not removed:
-        print("No scheduled tasks found.")
+        if removed:
+            print(f"Scheduled task removed.")
+        else:
+            print(f"No tasks found.")
 
 # ---------------------------------------------------------------------------
 # Command: install  (enroll + setup in one go)
@@ -556,7 +591,8 @@ def cmd_install(args):
     print()
     print("=" * 50)
     print("  Installation complete!")
-    print("  Usage will be reported twice daily: 9:00 AM and 6:00 PM.")
+    print("  Usage will be reported every 2 hours.")
+    print("  8am, 10am, 12pm, 2pm, 4pm, 6pm, 8pm")
     print("  Historical logs are also submitted automatically.")
     print("=" * 50)
     input("\nPress Enter to close...")
@@ -578,6 +614,9 @@ def cmd_status(_args):
         print(f"Enrolled      : no  (run: python aiops.py enroll)")
 
     print(f"Scheduler     : {'active' if task_exists() else 'not set up'}")
+    if task_exists():
+        print(f"  Tip: Run 'python aiops.py setup' to")
+        print(f"       update to every-2-hour schedule")
     print(f"Claude logs   : {CLAUDE_DIR / 'projects'}")
 
 # ---------------------------------------------------------------------------
@@ -611,7 +650,7 @@ def main():
     p_report = sub.add_parser("report", help="Post usage to AIOps server")
     p_report.add_argument("--date", default=None, help="YYYY-MM-DD (default: all historical dates)")
 
-    sub.add_parser("setup", help="Create twice-daily scheduled tasks (9 AM + 6 PM)")
+    sub.add_parser("setup", help="Create every-2-hour scheduled tasks (8am–8pm)")
     sub.add_parser("remove", help="Remove all scheduled tasks")
     sub.add_parser("status", help="Show enrollment and scheduler state")
 
