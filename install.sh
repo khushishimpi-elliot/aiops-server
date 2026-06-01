@@ -27,7 +27,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     fi
     python3 -m pip install --quiet --upgrade certifi \
       2>/dev/null || true
-    echo " SSL certificates ready."
+    echo " SSL ready."
 fi
 
 echo ""

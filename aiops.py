@@ -28,6 +28,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 DEFAULT_SERVER  = "https://aiops-server.onrender.com"
+RENDER_SERVER   = "https://aiops-server.onrender.com"
 DEFAULT_TOOL    = "claude_code"
 DEFAULT_TIME_PM = "18:00"
 DEFAULT_TIME_AM = "09:00"
@@ -82,7 +83,18 @@ def load_config() -> dict:
     if not CONFIG_FILE.exists():
         print("Not enrolled yet. Run:  python aiops.py enroll")
         sys.exit(1)
-    return json.loads(CONFIG_FILE.read_text())
+    config = json.loads(CONFIG_FILE.read_text())
+
+    # Auto-fix old local IP to Render URL
+    old_server = config.get("server", "")
+    if old_server != RENDER_SERVER and any(
+        x in old_server for x in ("localhost", "192.168", "10.179", "127.0.0.1")
+    ):
+        config["server"] = RENDER_SERVER
+        save_config(config)
+        print(f"  Auto-updated server to {RENDER_SERVER}")
+
+    return config
 
 
 def save_config(data: dict):
@@ -495,11 +507,33 @@ def parse_windsurf_logs(target_date: str) -> dict:
     return dict(totals)
 
 
+def _ensure_scheduler_up_to_date():
+    """Silently recreate the scheduler if it is missing."""
+    if not CONFIG_FILE.exists():
+        return
+    if task_exists():
+        return
+    python_exe  = sys.executable
+    script_path = str(Path(__file__).resolve())
+    try:
+        if IS_WINDOWS:
+            _setup_windows(python_exe, script_path)
+        else:
+            _setup_mac(python_exe, script_path)
+    except Exception:
+        pass
+
+
 def cmd_report(args):
     config    = load_config()
     server    = config["server"]
     device_id = config["device_id"]
     target    = args.date   # None means all historical dates
+
+    try:
+        _ensure_scheduler_up_to_date()
+    except Exception:
+        pass
 
     print("AIOps Telemetry Report")
     print(f"Server    : {server}")
@@ -682,7 +716,7 @@ def cmd_setup(args):
         _setup_mac(python_exe, script_path)
 
 
-def _setup_windows(python_exe, script_path):
+def _setup_windows(python_exe, script_path, time_str=None):
     # Remove existing tasks
     for suffix in ['', '_2', '_3', '_4', '_5', '_6', '_7']:
         subprocess.run(

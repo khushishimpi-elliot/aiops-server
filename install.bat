@@ -1,6 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 title Elliot Systems AIOps Setup
+cd /d "%~dp0"
 
 echo.
 echo  ================================================
