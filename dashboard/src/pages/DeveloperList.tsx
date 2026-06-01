@@ -4,6 +4,25 @@ import type { DevSummaryItem, DevDetailResponse } from '../types'
 import { formatCost, formatTokens, formatDate } from '../utils'
 
 const DEV_COLORS = ['#FF6600','#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899']
+const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#6b7280']
+
+const ALL_TOOLS = [
+  'claude_code','copilot','cursor','gemini','windsurf','cline',
+  'roo_code','codex','pi','kilo_code',
+]
+
+const TOOL_BADGE: Record<string, { bg: string; color: string; label: string }> = {
+  claude_code: { bg: '#fff3ec', color: '#FF6600', label: 'claude' },
+  copilot:     { bg: '#f1f5f9', color: '#374151', label: 'copilot' },
+  cursor:      { bg: '#eef2ff', color: '#6366f1', label: 'cursor' },
+  gemini:      { bg: '#eff6ff', color: '#3b82f6', label: 'gemini' },
+  windsurf:    { bg: '#f0fdf4', color: '#16a34a', label: 'windsurf' },
+  cline:       { bg: '#f0fdfa', color: '#0d9488', label: 'cline' },
+  roo_code:    { bg: '#fdf4ff', color: '#9333ea', label: 'roo' },
+  codex:       { bg: '#f0fdf4', color: '#15803d', label: 'codex' },
+  pi:          { bg: '#f8fafc', color: '#475569', label: 'pi' },
+  kilo_code:   { bg: '#fff7ed', color: '#c2410c', label: 'kilo' },
+}
 
 function nameFromEmail(email: string): string {
   const local = email.split('@')[0]
@@ -19,138 +38,140 @@ function isActive(lastActive: string | null): boolean {
   return Date.now() - new Date(lastActive).getTime() < 7 * 24 * 60 * 60 * 1000
 }
 
-function calcReadiness(data: DevDetailResponse): { score: number; breakdown: Record<string, number> } {
-  const now = Date.now()
-  const breakdown: Record<string, number> = {}
+function ToolBadge({ tool }: { tool: string }) {
+  const b = TOOL_BADGE[tool] ?? { bg: '#f1f5f9', color: '#374151', label: tool }
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+      background: b.bg, color: b.color, whiteSpace: 'nowrap',
+    }}>
+      {b.label}
+    </span>
+  )
+}
 
-  const recentUsed = data.daily.some(d => {
-    return (now - new Date(d.date).getTime()) / 86400000 <= 7 && d.cost_millicents > 0
-  })
-  breakdown.Engagement = recentUsed ? 10 : 0
-
+function calcReadiness(data: DevDetailResponse, days: number) {
   const activeDays = data.daily.filter(d => d.cost_millicents > 0).length
-  breakdown.Depth = activeDays >= 5 ? 10 : Math.round(activeDays / 5 * 10)
+  const tools = new Set(data.by_tool_model.map(r => r.tool)).size
+  const totalSessions = data.by_tool_model.reduce((s, r) => s + (r.session_count ?? r.days_active), 0)
+  const totalTokens = data.total_input_tokens + data.total_output_tokens
+  const avgTurns = totalSessions > 0 ? Math.round(totalTokens / 1000 / totalSessions) : 0
 
-  const tools = new Set(data.by_tool_model.map(r => r.tool))
-  breakdown.Coverage = tools.size >= 2 ? 10 : Math.round(tools.size / 2 * 10)
+  const engagement  = Math.min(Math.round(activeDays / Math.max(days, 1) * 25), 25)
+  const depth       = Math.min(Math.round(Math.min(avgTurns / 100, 1) * 25), 25)
+  const coverage    = Math.min(tools * 5, 20)
+  const progression = Math.min(Math.round(Math.min(data.total_cost_millicents / 1_000_000, 1) * 15), 15)
+  const friction    = Math.min(Math.round(activeDays / Math.max(days, 1) * 15), 15)
+  const score       = Math.min(engagement + depth + coverage + progression + friction, 100)
 
-  breakdown.Progression = data.total_cost_millicents >= 100_000 ? 10
-    : Math.round(data.total_cost_millicents / 100_000 * 10)
-
-  const models = new Set(data.by_tool_model.map(r => r.model))
-  breakdown.Friction = models.size >= 2 ? 10 : Math.round(models.size / 2 * 10)
-
-  const score = Math.min(50 + Object.values(breakdown).reduce((s, v) => s + v, 0), 100)
-  return { score, breakdown }
+  return {
+    score,
+    subs: [
+      { label: 'Engagement',  val: engagement,  max: 25, detail: `${activeDays} active days` },
+      { label: 'Depth',       val: depth,       max: 25, detail: `avg ${avgTurns}K tokens/session` },
+      { label: 'Coverage',    val: coverage,    max: 20, detail: `${tools} tools detected` },
+      { label: 'Progression', val: progression, max: 15, detail: data.total_cost_millicents > 1_000_000 ? 'power user' : 'growing' },
+      { label: 'Friction',    val: friction,    max: 15, detail: `${Math.round(activeDays / Math.max(days, 1) * 100)}% utilization` },
+    ],
+  }
 }
 
 const WEEKLY_BUDGET_MC  = 15_000 * 100
 const MONTHLY_BUDGET_MC = 50_000 * 100
 
-function DevDrawer({
-  email,
-  colorIdx,
-  days,
-  onClose,
-}: {
-  email: string
-  colorIdx: number
-  days: number
-  onClose: () => void
+function DevDrawer({ email, colorIdx, days, onClose }: {
+  email: string; colorIdx: number; days: number; onClose: () => void
 }) {
   const [data, setData] = useState<DevDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
-    setData(null)
-    api.developer(email, days)
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    setLoading(true); setData(null)
+    api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', fn)
+    return () => window.removeEventListener('keydown', fn)
   }, [onClose])
 
   const color  = DEV_COLORS[colorIdx % DEV_COLORS.length]
   const name   = nameFromEmail(email)
   const letter = avatarLetter(email)
 
-  // ── Derived data ──────────────────────────────────────────────────────────
-
+  // ── derived ──────────────────────────────────────────────────────────────
   const totalSessions = data
     ? data.by_tool_model.reduce((s, r) => s + (r.session_count ?? r.days_active), 0)
     : 0
 
-  const toolTotals = data ? (() => {
-    const map = new Map<string, { cost: number; tokens: number; sessions: number }>()
+  // Tool totals — include ALL known tools (0 for absent ones)
+  const toolMap = new Map<string, { cost: number; sessions: number }>()
+  if (data) {
     for (const row of data.by_tool_model) {
-      const e = map.get(row.tool) ?? { cost: 0, tokens: 0, sessions: 0 }
+      const e = toolMap.get(row.tool) ?? { cost: 0, sessions: 0 }
       e.cost    += row.cost_millicents
-      e.tokens  += row.input_tokens + row.output_tokens
       e.sessions += row.session_count ?? row.days_active
-      map.set(row.tool, e)
+      toolMap.set(row.tool, e)
     }
-    return [...map.entries()]
-      .sort((a, b) => b[1].sessions - a[1].sessions)
-      .map(([tool, v]) => ({ tool, ...v }))
-  })() : []
+  }
+  const toolList = [
+    ...ALL_TOOLS.filter(t => toolMap.has(t)).map(t => ({ tool: t, ...toolMap.get(t)! })),
+    ...ALL_TOOLS.filter(t => !toolMap.has(t)).map(t => ({ tool: t, cost: 0, sessions: 0 })),
+  ]
+  const maxToolSessions = Math.max(...toolList.map(t => t.sessions), 1)
 
-  const maxToolSessions = Math.max(...toolTotals.map(t => t.sessions), 1)
-
+  // Model totals
   const modelTotals = data ? (() => {
-    const map = new Map<string, { cost: number; tokens: number; sessions: number }>()
+    const map = new Map<string, { cost: number; sessions: number }>()
     for (const row of data.by_tool_model) {
-      const e = map.get(row.model) ?? { cost: 0, tokens: 0, sessions: 0 }
+      const e = map.get(row.model) ?? { cost: 0, sessions: 0 }
       e.cost    += row.cost_millicents
-      e.tokens  += row.input_tokens + row.output_tokens
       e.sessions += row.session_count ?? row.days_active
       map.set(row.model, e)
     }
-    const entries = [...map.entries()].sort((a, b) => b[1].cost - a[1].cost)
-    const maxCost = Math.max(...entries.map(([, v]) => v.cost), 1)
-    return entries.map(([model, v]) => ({ model, ...v, pct: Math.round(v.cost / maxCost * 100) }))
+    const entries = [...map.entries()].sort((a, b) => b[1].sessions - a[1].sessions)
+    const maxS = Math.max(...entries.map(([, v]) => v.sessions), 1)
+    return entries.map(([model, v]) => ({ model, ...v, pct: Math.round(v.sessions / maxS * 100) }))
   })() : []
 
   const now = Date.now()
 
-  const periodBreakdown = data ? (() => {
-    return [
-      { label: 'Today',  d: 1 },
-      { label: 'Week',   d: 7 },
-      { label: 'Month',  d: 30 },
-      { label: `${days}d`, d: days },
-    ].map(({ label, d }) => {
-      const rows = data.daily.filter(r =>
-        (now - new Date(r.date).getTime()) / 86400000 <= d && r.cost_millicents > 0
-      )
-      return {
-        label,
-        sessions: rows.length,
-        tokens:   rows.reduce((s, r) => s + r.input_tokens + r.output_tokens, 0),
-        cost:     rows.reduce((s, r) => s + r.cost_millicents, 0),
-      }
-    })
-  })() : []
+  // Period breakdown
+  const periods = data ? [
+    { label: 'Today', d: 1 },
+    { label: 'Week',  d: 7 },
+    { label: 'Month', d: 30 },
+    { label: 'Year',  d: 365 },
+  ].map(({ label, d }) => {
+    const rows = data.daily.filter(r =>
+      (now - new Date(r.date).getTime()) / 86400000 <= d && r.cost_millicents > 0
+    )
+    return {
+      label,
+      sessions: rows.length,
+      tokens: rows.reduce((s, r) => s + r.input_tokens + r.output_tokens, 0),
+      cost:    rows.reduce((s, r) => s + r.cost_millicents, 0),
+    }
+  }) : []
 
-  const weekCost = data
-    ? data.daily.filter(d => (now - new Date(d.date).getTime()) / 86400000 <= 7)
-        .reduce((s, d) => s + d.cost_millicents, 0)
-    : 0
-  const monthCost = data
-    ? data.daily.filter(d => (now - new Date(d.date).getTime()) / 86400000 <= 30)
-        .reduce((s, d) => s + d.cost_millicents, 0)
-    : 0
-  const weekPct  = WEEKLY_BUDGET_MC  > 0 ? Math.min(Math.round(weekCost  / WEEKLY_BUDGET_MC  * 100), 999) : 0
-  const monthPct = MONTHLY_BUDGET_MC > 0 ? Math.min(Math.round(monthCost / MONTHLY_BUDGET_MC * 100), 999) : 0
+  // Budget
+  const weekCost  = data ? data.daily.filter(d => (now - new Date(d.date).getTime()) / 86400000 <= 7)
+    .reduce((s, d) => s + d.cost_millicents, 0) : 0
+  const monthCost = data ? data.daily.filter(d => (now - new Date(d.date).getTime()) / 86400000 <= 30)
+    .reduce((s, d) => s + d.cost_millicents, 0) : 0
+  const weekPct  = Math.min(Math.round(weekCost  / WEEKLY_BUDGET_MC  * 100), 999)
+  const monthPct = Math.min(Math.round(monthCost / MONTHLY_BUDGET_MC * 100), 999)
 
-  const readiness = data ? calcReadiness(data) : null
-  const maxDailyCost = data ? Math.max(...data.daily.map(d => d.cost_millicents), 1) : 1
-  const activeDays = data ? data.daily.filter(d => d.cost_millicents > 0) : []
+  const readiness = data ? calcReadiness(data, days) : null
+  const maxDailyCost  = data ? Math.max(...data.daily.map(d => d.cost_millicents), 1) : 1
+  const activeDayRows = data ? data.daily.filter(d => d.cost_millicents > 0) : []
+
+  const lastSync = data?.last_seen_at
+    ? new Date(data.last_seen_at).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : activeDayRows.length > 0
+      ? activeDayRows.sort((a, b) => b.date.localeCompare(a.date))[0].date
+      : '—'
 
   return (
     <>
@@ -168,15 +189,13 @@ function DevDrawer({
           </div>
           <button className="drawer-close" onClick={onClose} aria-label="Close">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
 
         <div className="drawer-body">
           {loading && <p className="page-loading">Loading…</p>}
-
           {data && (
             <>
               {/* Summary stats */}
@@ -199,31 +218,87 @@ function DevDrawer({
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Machine Info</div>
                 <div className="drawer-info-grid">
+                  <span className="drawer-info-key">Name</span>
+                  <span className="drawer-info-val">{name}</span>
                   <span className="drawer-info-key">Email</span>
                   <span className="drawer-info-val">{data.email}</span>
+                  {data.machine_label && <>
+                    <span className="drawer-info-key">Machine</span>
+                    <span className="drawer-info-val">{data.machine_label}</span>
+                  </>}
+                  {data.team_name && <>
+                    <span className="drawer-info-key">Team</span>
+                    <span className="drawer-info-val">{data.team_name}</span>
+                  </>}
                   <span className="drawer-info-key">Enrolled</span>
                   <span className="drawer-info-val">{formatDate(data.enrolled_at)}</span>
-                  <span className="drawer-info-key">Active Days</span>
-                  <span className="drawer-info-val">{activeDays.length}</span>
+                  <span className="drawer-info-key">Last Sync</span>
+                  <span className="drawer-info-val">{lastSync}</span>
                   <span className="drawer-info-key">Status</span>
-                  <span className="drawer-info-val">{activeDays.length > 0 ? 'Active' : 'Inactive'}</span>
+                  <span className="drawer-info-val">{activeDayRows.length > 0 ? 'Active' : 'Inactive'}</span>
                 </div>
               </div>
 
               {/* Tools Detected */}
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Tools Detected</div>
-                {toolTotals.length === 0 ? (
-                  <p className="no-data">No tool data yet</p>
-                ) : toolTotals.map(t => (
+                {toolList.map(t => (
                   <div className="drawer-bar-row" key={t.tool}>
-                    <span className="drawer-bar-label">{t.tool}</span>
+                    <span className="drawer-bar-label">{t.tool.replace('_', ' ')}</span>
                     <div className="drawer-bar-track">
                       <div className="drawer-bar-fill" style={{ width: `${Math.round(t.sessions / maxToolSessions * 100)}%` }} />
                     </div>
-                    <span className="drawer-bar-val">{t.sessions} sessions · {formatCost(t.cost)}</span>
+                    <span className="drawer-bar-val">
+                      {t.sessions > 0 ? `${t.sessions} sessions${t.cost > 0 ? ' · ' + formatCost(t.cost) : ''}` : '0 sessions'}
+                    </span>
                   </div>
                 ))}
+              </div>
+
+              {/* Tasks AI Used For */}
+              {data.task_categories.length > 0 && (
+                <div className="drawer-section">
+                  <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
+                  {data.task_categories.map((c, i) => (
+                    <div key={c.category} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{c.category}</span>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
+                      </div>
+                      <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
+                        <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Daily Breakdown */}
+              <div className="drawer-section">
+                <div className="drawer-section-title"><span className="dsicon">◆</span> Daily Breakdown</div>
+                {data.daily_by_tool.length === 0 ? (
+                  <p className="no-data">No data</p>
+                ) : (
+                  <table className="drawer-table">
+                    <thead>
+                      <tr><th>Date</th><th>Tool</th><th>Model</th><th>Sessions</th><th>Tokens</th></tr>
+                    </thead>
+                    <tbody>
+                      {data.daily_by_tool.slice(0, 15).map((r, i) => (
+                        <tr key={i}>
+                          <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
+                          <td><ToolBadge tool={r.tool} /></td>
+                          <td><span className="model-pill">{r.model.replace('claude-','').replace('-20251001','')}</span></td>
+                          <td>{r.session_count}</td>
+                          <td>{formatTokens(r.input_tokens + r.output_tokens)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               {/* Usage By Period */}
@@ -234,9 +309,9 @@ function DevDrawer({
                     <tr><th>Period</th><th>Sessions</th><th>Tokens</th><th>Cost</th></tr>
                   </thead>
                   <tbody>
-                    {periodBreakdown.map(p => (
+                    {periods.map(p => (
                       <tr key={p.label}>
-                        <td>{p.label}</td>
+                        <td style={{ fontWeight: 600 }}>{p.label}</td>
                         <td>{p.sessions}</td>
                         <td>{formatTokens(p.tokens)}</td>
                         <td style={{ fontWeight: 600, color: 'var(--brand)' }}>{formatCost(p.cost)}</td>
@@ -246,45 +321,40 @@ function DevDrawer({
                 </table>
               </div>
 
-              {/* Daily Breakdown */}
+              {/* Tokens */}
               <div className="drawer-section">
-                <div className="drawer-section-title"><span className="dsicon">◆</span> Daily Breakdown</div>
-                {activeDays.length === 0 ? (
-                  <p className="no-data">No daily data</p>
-                ) : (
-                  <table className="drawer-table">
-                    <thead>
-                      <tr><th>Date</th><th>Input</th><th>Output</th><th>Cost</th></tr>
-                    </thead>
-                    <tbody>
-                      {[...data.daily]
-                        .sort((a, b) => b.date.localeCompare(a.date))
-                        .filter(d => d.cost_millicents > 0)
-                        .slice(0, 14)
-                        .map(d => (
-                          <tr key={d.date}>
-                            <td>{d.date}</td>
-                            <td>{formatTokens(d.input_tokens)}</td>
-                            <td>{formatTokens(d.output_tokens)}</td>
-                            <td style={{ fontWeight: 600, color: 'var(--brand)' }}>{formatCost(d.cost_millicents)}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                )}
+                <div className="drawer-section-title"><span className="dsicon">◆</span> Tokens</div>
+                <div className="drawer-info-grid">
+                  <span className="drawer-info-key">Input</span>
+                  <span className="drawer-info-val">
+                    {data.total_input_tokens.toLocaleString()}
+                    <span style={{ fontSize: 10, color: 'var(--gray-400)', fontFamily: 'sans-serif', marginLeft: 4 }}>tokens sent to AI</span>
+                  </span>
+                  <span className="drawer-info-key">Output</span>
+                  <span className="drawer-info-val">
+                    {data.total_output_tokens.toLocaleString()}
+                    <span style={{ fontSize: 10, color: 'var(--gray-400)', fontFamily: 'sans-serif', marginLeft: 4 }}>tokens received</span>
+                  </span>
+                  {data.total_cache_read_tokens > 0 && <>
+                    <span className="drawer-info-key">Cache</span>
+                    <span className="drawer-info-val">
+                      {data.total_cache_read_tokens.toLocaleString()}
+                      <span style={{ fontSize: 10, color: '#16a34a', fontFamily: 'sans-serif', marginLeft: 4 }}>reused (saves money)</span>
+                    </span>
+                  </>}
+                  <span className="drawer-info-key">Total</span>
+                  <span className="drawer-info-val">
+                    {(data.total_input_tokens + data.total_output_tokens + data.total_cache_read_tokens).toLocaleString()}
+                  </span>
+                </div>
               </div>
 
               {/* Daily Cost Trend */}
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Daily Cost Trend</div>
-                {activeDays.length === 0 ? (
-                  <p className="no-data">No data</p>
-                ) : (
-                  [...data.daily]
-                    .sort((a, b) => b.date.localeCompare(a.date))
-                    .filter(d => d.cost_millicents > 0)
-                    .slice(0, 10)
-                    .map(d => (
+                {activeDayRows.length === 0 ? <p className="no-data">No data</p> : (
+                  [...data.daily].sort((a, b) => b.date.localeCompare(a.date))
+                    .filter(d => d.cost_millicents > 0).slice(0, 10).map(d => (
                       <div className="drawer-bar-row" key={d.date}>
                         <span className="drawer-bar-label">{d.date.slice(5)}</span>
                         <div className="drawer-bar-track">
@@ -296,41 +366,22 @@ function DevDrawer({
                 )}
               </div>
 
-              {/* Tokens */}
-              <div className="drawer-section">
-                <div className="drawer-section-title"><span className="dsicon">◆</span> Tokens</div>
-                <div className="drawer-info-grid">
-                  <span className="drawer-info-key">Input</span>
-                  <span className="drawer-info-val">
-                    {data.total_input_tokens.toLocaleString()}
-                    <span style={{ fontSize: 10, color: 'var(--gray-400)', fontFamily: 'sans-serif', marginLeft: 4 }}>tokens sent</span>
-                  </span>
-                  <span className="drawer-info-key">Output</span>
-                  <span className="drawer-info-val">
-                    {data.total_output_tokens.toLocaleString()}
-                    <span style={{ fontSize: 10, color: 'var(--gray-400)', fontFamily: 'sans-serif', marginLeft: 4 }}>tokens received</span>
-                  </span>
-                  <span className="drawer-info-key">Total</span>
-                  <span className="drawer-info-val">
-                    {(data.total_input_tokens + data.total_output_tokens).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
               {/* Models Used */}
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Models Used</div>
-                {modelTotals.length === 0 ? (
-                  <p className="no-data">No model data yet</p>
-                ) : modelTotals.map(m => (
-                  <div className="drawer-bar-row" key={m.model}>
-                    <span className="drawer-bar-label wide">{m.model}</span>
-                    <div className="drawer-bar-track">
-                      <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
+                {modelTotals.length === 0 ? <p className="no-data">No model data yet</p> : (
+                  modelTotals.map(m => (
+                    <div className="drawer-bar-row" key={m.model}>
+                      <span className="drawer-bar-label wide">{m.model}</span>
+                      <div className="drawer-bar-track">
+                        <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
+                      </div>
+                      <span className="drawer-bar-val">
+                        {m.sessions} sessions{m.cost > 0 ? ' · ' + formatCost(m.cost) : ' · —'}
+                      </span>
                     </div>
-                    <span className="drawer-bar-val">{m.sessions} sessions · {formatCost(m.cost)}</span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
 
               {/* Readiness Score */}
@@ -339,31 +390,30 @@ function DevDrawer({
                   <div className="drawer-section-title"><span className="dsicon">◆</span> Readiness Score</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
                     <div style={{
-                      fontSize: 44, fontWeight: 800, lineHeight: 1,
+                      fontSize: 48, fontWeight: 800, lineHeight: 1,
                       color: readiness.score >= 70 ? 'var(--brand)' : readiness.score >= 40 ? '#f59e0b' : '#ef4444',
                     }}>
                       {readiness.score}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, color: 'var(--gray-500)', marginBottom: 6 }}>out of 100</div>
+                      <div style={{ fontSize: 11, color: 'var(--gray-500)', marginBottom: 6 }}>/ 100</div>
                       <div style={{ height: 8, background: 'var(--gray-100)', borderRadius: 4, overflow: 'hidden' }}>
                         <div style={{
-                          height: '100%',
-                          width: `${readiness.score}%`,
+                          height: '100%', width: `${readiness.score}%`, borderRadius: 4, transition: 'width 0.6s ease',
                           background: readiness.score >= 70 ? 'var(--brand)' : readiness.score >= 40 ? '#f59e0b' : '#ef4444',
-                          borderRadius: 4,
-                          transition: 'width 0.6s ease',
                         }} />
                       </div>
                     </div>
                   </div>
-                  {Object.entries(readiness.breakdown).map(([key, val]) => (
-                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                      <span style={{ width: 90, fontSize: 12, color: 'var(--gray-600)', flexShrink: 0 }}>{key}</span>
+                  {readiness.subs.map(s => (
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                      <span style={{ width: 90, fontSize: 12, color: 'var(--gray-600)', flexShrink: 0 }}>{s.label}</span>
                       <div style={{ flex: 1, height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
-                        <div style={{ height: '100%', width: `${val * 10}%`, background: 'var(--brand)', borderRadius: 2 }} />
+                        <div style={{ height: '100%', width: `${Math.round(s.val / s.max * 100)}%`, background: 'var(--brand)', borderRadius: 2 }} />
                       </div>
-                      <span style={{ fontSize: 12, color: 'var(--gray-500)', width: 34, textAlign: 'right' }}>{val}/10</span>
+                      <span style={{ fontSize: 11, color: 'var(--gray-500)', minWidth: 80, textAlign: 'right' }}>
+                        {s.val}/{s.max} · {s.detail}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -378,27 +428,24 @@ function DevDrawer({
                 ].map(b => (
                   <div key={b.label} style={{ marginBottom: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-700)' }}>{b.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>{b.label}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
                           {formatCost(b.cost)} / {formatCost(b.budget)}
                         </span>
                         <span style={{
-                          fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+                          fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
                           background: b.pct > 100 ? '#fee2e2' : '#f0fdf4',
                           color: b.pct > 100 ? '#dc2626' : '#16a34a',
                         }}>
-                          {b.pct}%
+                          {b.pct}%{b.pct > 100 ? ' ↑' : ''}
                         </span>
                       </div>
                     </div>
                     <div style={{ height: 6, background: 'var(--gray-100)', borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{
-                        height: '100%',
-                        width: `${Math.min(b.pct, 100)}%`,
+                        height: '100%', width: `${Math.min(b.pct, 100)}%`, borderRadius: 3, transition: 'width 0.5s ease',
                         background: b.pct > 100 ? '#ef4444' : 'var(--brand)',
-                        borderRadius: 3,
-                        transition: 'width 0.5s ease',
                       }} />
                     </div>
                   </div>
@@ -423,27 +470,19 @@ export default function DeveloperList() {
   const [lastUpdated, setLastUpdated] = useState('')
 
   function fetchDevelopers() {
-    setDevelopers(null)
-    setError('')
+    setDevelopers(null); setError('')
     api.developers(days)
-      .then(r => {
-        setDevelopers(r.developers)
-        setLastUpdated(new Date().toLocaleTimeString())
-      })
+      .then(r => { setDevelopers(r.developers); setLastUpdated(new Date().toLocaleTimeString()) })
       .catch(e => setError(e.message))
   }
 
-  useEffect(() => {
-    fetchDevelopers()
-  }, [days])
-
+  useEffect(() => { fetchDevelopers() }, [days])
   useEffect(() => {
     const id = setInterval(() => { fetchDevelopers() }, 5 * 60 * 1000)
     return () => clearInterval(id)
   }, [])
 
   const closeDrawer = useCallback(() => setDrawerEmail(null), [])
-
   const filtered = developers?.filter(dev =>
     dev.email.toLowerCase().includes(search.toLowerCase()) ||
     nameFromEmail(dev.email).toLowerCase().includes(search.toLowerCase())
@@ -463,11 +502,7 @@ export default function DeveloperList() {
             )}
           </div>
         </div>
-        <select
-          className="period-select"
-          value={days}
-          onChange={e => setDays(Number(e.target.value))}
-        >
+        <select className="period-select" value={days} onChange={e => setDays(Number(e.target.value))}>
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
           <option value={90}>Last 90 days</option>
@@ -476,7 +511,6 @@ export default function DeveloperList() {
 
       <div className="content-area">
         {error && <div className="page-error">{error}</div>}
-
         <div className="dev-page-header">
           <div>
             <div className="dev-page-title">All Developers</div>
@@ -486,16 +520,10 @@ export default function DeveloperList() {
           </div>
           <div className="search-wrap">
             <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Search developers…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+            <input className="search-input" type="text" placeholder="Search developers…"
+              value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 
@@ -504,30 +532,19 @@ export default function DeveloperList() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Developer</th>
-                  <th>Cost</th>
-                  <th>Input Tokens</th>
-                  <th>Output Tokens</th>
-                  <th>Status</th>
-                  <th>Last Active</th>
+                  <th>Developer</th><th>Cost</th><th>Input Tokens</th>
+                  <th>Output Tokens</th><th>Status</th><th>Last Active</th>
                 </tr>
               </thead>
               <tbody>
-                {!developers && !error && (
-                  <tr><td colSpan={6} className="empty-cell">Loading…</td></tr>
-                )}
-                {developers && filtered.length === 0 && (
-                  <tr><td colSpan={6} className="empty-cell">No developers found</td></tr>
-                )}
+                {!developers && !error && <tr><td colSpan={6} className="empty-cell">Loading…</td></tr>}
+                {developers && filtered.length === 0 && <tr><td colSpan={6} className="empty-cell">No developers found</td></tr>}
                 {filtered.map((dev, i) => {
                   const active = isActive(dev.last_active)
                   const colorIdx = i % DEV_COLORS.length
                   return (
-                    <tr
-                      key={dev.user_id}
-                      className="clickable-row"
-                      onClick={() => { setDrawerEmail(dev.email); setDrawerColorIdx(colorIdx) }}
-                    >
+                    <tr key={dev.user_id} className="clickable-row"
+                      onClick={() => { setDrawerEmail(dev.email); setDrawerColorIdx(colorIdx) }}>
                       <td>
                         <div className="dev-cell">
                           <div className="dev-sq-avatar" style={{ background: DEV_COLORS[colorIdx] }}>
@@ -544,8 +561,7 @@ export default function DeveloperList() {
                       <td style={{ fontVariantNumeric: 'tabular-nums' }}>{formatTokens(dev.total_output_tokens)}</td>
                       <td>
                         <span className={`badge ${active ? 'badge-active' : 'badge-inactive'}`}>
-                          <span className="badge-dot" />
-                          {active ? 'Active' : 'Inactive'}
+                          <span className="badge-dot" />{active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td style={{ color: 'var(--gray-500)', fontSize: 12 }}>
@@ -561,12 +577,7 @@ export default function DeveloperList() {
       </div>
 
       {drawerEmail && (
-        <DevDrawer
-          email={drawerEmail}
-          colorIdx={drawerColorIdx}
-          days={days}
-          onClose={closeDrawer}
-        />
+        <DevDrawer email={drawerEmail} colorIdx={drawerColorIdx} days={days} onClose={closeDrawer} />
       )}
     </>
   )

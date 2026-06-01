@@ -93,6 +93,16 @@ class DailyUsage(BaseModel):
     output_tokens: int
 
 
+class DailyToolRow(BaseModel):
+    date: date
+    tool: str
+    model: str
+    session_count: int
+    input_tokens: int
+    output_tokens: int
+    cost_millicents: int
+
+
 class DevSummaryItem(BaseModel):
     user_id: int
     email: str
@@ -116,8 +126,14 @@ class DevDetailResponse(BaseModel):
     total_cost_millicents: int
     total_input_tokens: int
     total_output_tokens: int
+    total_cache_read_tokens: int = 0
     by_tool_model: list[ToolModelBreakdown]
     daily: list[DailyUsage]
+    daily_by_tool: list[DailyToolRow] = []
+    task_categories: list[TaskCategoryItem] = []
+    team_name: str | None = None
+    machine_label: str | None = None
+    last_seen_at: datetime | None = None
 
 
 class TaskCategoryItem(BaseModel):

@@ -190,25 +190,6 @@ export default function OrgOverview() {
                 <div className="stat-meta">With usage this period</div>
               </div>
 
-              <div className="stat-card">
-                <div className="stat-top">
-                  <div>
-                    <div className="stat-label">Total Sessions</div>
-                    <div className="stat-value">
-                      {data.by_tool_model.reduce((s, r) => s + (r.session_count ?? 0), 0)
-                        || data.active_developers * 8}
-                    </div>
-                  </div>
-                  <div className="stat-icon brand-bg">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="3" width="20" height="14" rx="2"/>
-                      <line x1="8" y1="21" x2="16" y2="21"/>
-                      <line x1="12" y1="17" x2="12" y2="21"/>
-                    </svg>
-                  </div>
-                </div>
-                <div className="stat-meta">Active sessions this period</div>
-              </div>
             </div>
 
             {/* Panels Grid */}

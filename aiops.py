@@ -169,7 +169,7 @@ def cmd_enroll(args):
         enroll_resp = post(server, "/enroll/device", {
             "enrollment_token": token,
             "machine_id": machine_id,
-            "hostname": hostname,
+            "label": hostname,
             "tool": args.tool,
         })
     except RuntimeError as e:

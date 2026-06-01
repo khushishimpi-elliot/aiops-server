@@ -49,6 +49,16 @@ export interface DevSummaryResponse {
   developers: DevSummaryItem[]
 }
 
+export interface DailyToolRow {
+  date: string
+  tool: string
+  model: string
+  session_count: number
+  input_tokens: number
+  output_tokens: number
+  cost_millicents: number
+}
+
 export interface DevDetailResponse {
   user_id: number
   email: string
@@ -56,6 +66,12 @@ export interface DevDetailResponse {
   total_cost_millicents: number
   total_input_tokens: number
   total_output_tokens: number
+  total_cache_read_tokens: number
   by_tool_model: ToolModelBreakdown[]
   daily: DailyUsage[]
+  daily_by_tool: DailyToolRow[]
+  task_categories: TaskCategoryItem[]
+  team_name: string | null
+  machine_label: string | null
+  last_seen_at: string | null
 }

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from ..db import get_db
 from ..errors import AppError
 from ..models import (
+    DailyToolRow,
     DevDetailResponse,
     DevSummaryResponse,
     DailyUsage,
@@ -93,9 +94,10 @@ async def developer_detail(
     totals = await conn.fetchrow(
         """
         SELECT
-            COALESCE(SUM(cost_millicents), 0)::bigint AS cost_millicents,
-            COALESCE(SUM(input_tokens),    0)::bigint AS input_tokens,
-            COALESCE(SUM(output_tokens),   0)::bigint AS output_tokens
+            COALESCE(SUM(cost_millicents),   0)::bigint AS cost_millicents,
+            COALESCE(SUM(input_tokens),      0)::bigint AS input_tokens,
+            COALESCE(SUM(output_tokens),     0)::bigint AS output_tokens,
+            COALESCE(SUM(cache_read_tokens), 0)::bigint AS cache_read_tokens
         FROM usage
         WHERE user_id = $1 AND date >= CURRENT_DATE - $2::integer
         """,
@@ -121,6 +123,55 @@ async def developer_detail(
         user["id"], days,
     )
 
+    daily_tool_rows = await conn.fetch(
+        """
+        SELECT date, tool, model,
+               COUNT(*)::int               AS session_count,
+               SUM(input_tokens)::bigint   AS input_tokens,
+               SUM(output_tokens)::bigint  AS output_tokens,
+               SUM(cost_millicents)::bigint AS cost_millicents
+        FROM   usage
+        WHERE  user_id = $1 AND date >= CURRENT_DATE - $2::integer
+        GROUP  BY date, tool, model
+        ORDER  BY date DESC, cost_millicents DESC
+        """,
+        user["id"], days,
+    )
+
+    cat_rows = await conn.fetch(
+        """
+        SELECT category, SUM(session_count)::int AS total
+        FROM   usage_categories
+        WHERE  user_id = $1 AND date >= CURRENT_DATE - $2::integer
+        GROUP  BY category
+        ORDER  BY total DESC
+        """,
+        user["id"], days,
+    )
+
+    device_row = await conn.fetchrow(
+        """
+        SELECT d.label, d.last_seen_at, t.name AS team_name
+        FROM   devices d
+        JOIN   users u ON u.id = d.user_id
+        JOIN   teams t ON t.id = u.team_id
+        WHERE  d.user_id = $1
+        ORDER  BY d.last_seen_at DESC NULLS LAST
+        LIMIT  1
+        """,
+        user["id"],
+    )
+
+    cat_total = sum(r["total"] for r in cat_rows) or 1
+    task_categories = [
+        TaskCategoryItem(
+            category=r["category"],
+            session_count=r["total"],
+            pct=round(r["total"] / cat_total * 100),
+        )
+        for r in cat_rows
+    ]
+
     return DevDetailResponse(
         user_id=user["id"],
         email=user["email"],
@@ -128,6 +179,7 @@ async def developer_detail(
         total_cost_millicents=totals["cost_millicents"],
         total_input_tokens=totals["input_tokens"],
         total_output_tokens=totals["output_tokens"],
+        total_cache_read_tokens=totals["cache_read_tokens"],
         by_tool_model=[
             ToolModelBreakdown(
                 tool=r["tool"],
@@ -149,6 +201,22 @@ async def developer_detail(
             )
             for r in daily_rows
         ],
+        daily_by_tool=[
+            DailyToolRow(
+                date=r["date"],
+                tool=r["tool"],
+                model=r["model"],
+                session_count=r["session_count"],
+                input_tokens=r["input_tokens"],
+                output_tokens=r["output_tokens"],
+                cost_millicents=r["cost_millicents"],
+            )
+            for r in daily_tool_rows
+        ],
+        task_categories=task_categories,
+        team_name=device_row["team_name"] if device_row else None,
+        machine_label=device_row["label"] if device_row else None,
+        last_seen_at=device_row["last_seen_at"] if device_row else None,
     )
 
 
