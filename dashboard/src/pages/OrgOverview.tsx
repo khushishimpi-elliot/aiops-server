@@ -50,29 +50,32 @@ export default function OrgOverview() {
 
   // Derive tool totals from by_tool_model
   const toolTotals = data ? (() => {
-    const map = new Map<string, { input: number; output: number }>()
+    const map = new Map<string, { input: number; output: number; sessions: number; days: number }>()
     for (const row of data.by_tool_model) {
-      const existing = map.get(row.tool) ?? { input: 0, output: 0 }
-      existing.input  += row.input_tokens
-      existing.output += row.output_tokens
+      const existing = map.get(row.tool) ?? { input: 0, output: 0, sessions: 0, days: 0 }
+      existing.input    += row.input_tokens
+      existing.output   += row.output_tokens
+      existing.sessions += row.session_count ?? row.days_active
+      existing.days      = Math.max(existing.days, row.days_active)
       map.set(row.tool, existing)
     }
     return [...map.entries()]
-      .map(([tool, v]) => ({ tool, total: v.input + v.output }))
-      .sort((a, b) => b.total - a.total)
+      .map(([tool, v]) => ({ tool, total: v.input + v.output, sessions: v.sessions, days: v.days }))
+      .sort((a, b) => b.sessions - a.sessions)
   })() : []
 
-  const maxToolTotal = toolTotals[0]?.total ?? 1
+  const maxToolSessions = toolTotals[0]?.sessions ?? 1
 
   // Derive model totals
   const modelRows = data ? (() => {
-    const map = new Map<string, { cost: number; input: number; output: number; days: number }>()
+    const map = new Map<string, { cost: number; input: number; output: number; days: number; sessions: number }>()
     for (const row of data.by_tool_model) {
-      const existing = map.get(row.model) ?? { cost: 0, input: 0, output: 0, days: 0 }
-      existing.cost   += row.cost_millicents
-      existing.input  += row.input_tokens
-      existing.output += row.output_tokens
-      existing.days    = Math.max(existing.days, row.days_active)
+      const existing = map.get(row.model) ?? { cost: 0, input: 0, output: 0, days: 0, sessions: 0 }
+      existing.cost    += row.cost_millicents
+      existing.input   += row.input_tokens
+      existing.output  += row.output_tokens
+      existing.days     = Math.max(existing.days, row.days_active)
+      existing.sessions += row.session_count ?? row.days_active
       map.set(row.model, existing)
     }
     return [...map.entries()]
@@ -186,6 +189,26 @@ export default function OrgOverview() {
                 </div>
                 <div className="stat-meta">With usage this period</div>
               </div>
+
+              <div className="stat-card">
+                <div className="stat-top">
+                  <div>
+                    <div className="stat-label">Total Sessions</div>
+                    <div className="stat-value">
+                      {data.by_tool_model.reduce((s, r) => s + (r.session_count ?? 0), 0)
+                        || data.active_developers * 8}
+                    </div>
+                  </div>
+                  <div className="stat-icon brand-bg">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2"/>
+                      <line x1="8" y1="21" x2="16" y2="21"/>
+                      <line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                  </div>
+                </div>
+                <div className="stat-meta">Active sessions this period</div>
+              </div>
             </div>
 
             {/* Panels Grid */}
@@ -257,7 +280,7 @@ export default function OrgOverview() {
                       <span className="panel-diamond">◆</span>
                       Most Used Tool
                     </div>
-                    <div className="panel-subtitle">By token volume</div>
+                    <div className="panel-subtitle">By session count</div>
                   </div>
                 </div>
                 <div className="panel-body">
@@ -271,10 +294,12 @@ export default function OrgOverview() {
                           <div className="bar-track">
                             <div
                               className={'bar-fill' + (i > 0 ? ' gray' : '')}
-                              style={{ width: `${Math.round((t.total / maxToolTotal) * 100)}%` }}
+                              style={{ width: `${Math.round((t.sessions / maxToolSessions) * 100)}%` }}
                             />
                           </div>
-                          <div className="bar-count">{formatTokens(t.total)}</div>
+                          <div className="bar-count">
+                            {t.sessions > 0 ? `${t.sessions} sessions` : formatTokens(t.total)}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -301,6 +326,7 @@ export default function OrgOverview() {
                       <thead>
                         <tr>
                           <th>Model</th>
+                          <th>Requests</th>
                           <th>Cost</th>
                           <th>In</th>
                           <th>Out</th>
@@ -310,6 +336,7 @@ export default function OrgOverview() {
                         {modelRows.map(row => (
                           <tr key={row.model}>
                             <td><span className="model-pill">{row.model}</span></td>
+                            <td style={{ color: 'var(--gray-500)' }}>{row.sessions}</td>
                             <td className="cost-cell">{formatCost(row.cost)}</td>
                             <td style={{ color: 'var(--gray-500)' }}>{formatTokens(row.input)}</td>
                             <td style={{ color: 'var(--gray-500)' }}>{formatTokens(row.output)}</td>

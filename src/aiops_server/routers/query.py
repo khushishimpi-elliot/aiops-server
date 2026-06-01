@@ -136,6 +136,7 @@ async def developer_detail(
                 input_tokens=r["input_tokens"],
                 output_tokens=r["output_tokens"],
                 days_active=r["days_active"],
+                session_count=r["days_active"],
             )
             for r in breakdown_rows
         ],
@@ -213,6 +214,7 @@ async def org_overview(
                 input_tokens=r["input_tokens"],
                 output_tokens=r["output_tokens"],
                 days_active=r["days_active"],
+                session_count=r["days_active"],
             )
             for r in breakdown_rows
         ],

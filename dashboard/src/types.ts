@@ -5,6 +5,7 @@ export interface ToolModelBreakdown {
   input_tokens: number
   output_tokens: number
   days_active: number
+  session_count?: number
 }
 
 export interface DailyUsage {

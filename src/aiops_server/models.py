@@ -83,6 +83,7 @@ class ToolModelBreakdown(BaseModel):
     input_tokens: int
     output_tokens: int
     days_active: int
+    session_count: int = Field(default=0)
 
 
 class DailyUsage(BaseModel):
