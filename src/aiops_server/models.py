@@ -61,6 +61,8 @@ class DailyRollupRequest(BaseModel):
     output_tokens: int = Field(ge=0)
     cache_read_tokens: int = Field(default=0, ge=0)
     cache_write_tokens: int = Field(default=0, ge=0)
+    sessions: int = Field(default=1, ge=0)
+    turns: int = Field(default=0, ge=0)
     idempotency_key: str = Field(min_length=8, max_length=128)
     agent_version: str | None = None  # reported on every rollup, updates devices.agent_version
 

@@ -252,12 +252,68 @@ def _classify_session(tool_uses: list) -> str:
     return "Code Generation"
 
 
-def parse_claude_logs() -> dict:
+def parse_claude_logs(target_date: str) -> dict:
     """
-    Scans all Claude Code log files across all projects and dates.
-    Returns: { "YYYY-MM-DD": { "model-name": { input_tokens, output_tokens,
-                                                cache_read_tokens, cache_write_tokens } } }
+    Parse Claude Code logs for a single date, grouped by session.
+    Returns: { model: { input_tokens, output_tokens, cache_*, sessions, turns } }
     """
+    model_data: dict = defaultdict(lambda: {
+        "input_tokens": 0, "output_tokens": 0,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+        "sessions": set(),
+        "turns": 0,
+    })
+    projects_dir = CLAUDE_DIR / "projects"
+    if not projects_dir.exists():
+        return {}
+
+    for jsonl_file in projects_dir.rglob("*.jsonl"):
+        try:
+            content = jsonl_file.read_text(encoding="utf-8").replace("\r\n", "\n")
+            for line in content.splitlines():
+                line = line.strip()
+                if not line or not line.startswith("{"):
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("type") != "assistant":
+                    continue
+                ts = entry.get("timestamp", "")
+                if not ts.startswith(target_date):
+                    continue
+                msg   = entry.get("message", {})
+                usage = msg.get("usage")
+                if not usage:
+                    continue
+                model = msg.get("model", "unknown") or "unknown"
+                model_data[model]["input_tokens"]       += usage.get("input_tokens", 0)
+                model_data[model]["output_tokens"]      += usage.get("output_tokens", 0)
+                model_data[model]["cache_read_tokens"]  += usage.get("cache_read_input_tokens", 0)
+                model_data[model]["cache_write_tokens"] += usage.get("cache_creation_input_tokens", 0)
+                model_data[model]["sessions"].add(str(jsonl_file))
+                model_data[model]["turns"] += 1
+        except Exception:
+            continue
+
+    result = {}
+    for model, data in model_data.items():
+        if data["input_tokens"] + data["output_tokens"] == 0:
+            continue
+        result[model] = {
+            "input_tokens":       data["input_tokens"],
+            "output_tokens":      data["output_tokens"],
+            "cache_read_tokens":  data["cache_read_tokens"],
+            "cache_write_tokens": data["cache_write_tokens"],
+            "sessions":           len(data["sessions"]),
+            "turns":              data["turns"],
+        }
+    return result
+
+
+def _parse_claude_logs_all() -> dict:
+    """Scan all dates — used only for historical bulk upload."""
     by_date: dict = defaultdict(lambda: defaultdict(lambda: {
         "input_tokens": 0, "output_tokens": 0,
         "cache_read_tokens": 0, "cache_write_tokens": 0,
@@ -282,7 +338,7 @@ def parse_claude_logs() -> dict:
                 usage = msg.get("usage")
                 if not usage:
                     continue
-                model = msg.get("model", "unknown")
+                model = msg.get("model", "unknown") or "unknown"
                 by_date[date_str][model]["input_tokens"]       += usage.get("input_tokens", 0)
                 by_date[date_str][model]["output_tokens"]      += usage.get("output_tokens", 0)
                 by_date[date_str][model]["cache_read_tokens"]  += usage.get("cache_read_input_tokens", 0)
@@ -290,7 +346,7 @@ def parse_claude_logs() -> dict:
         except Exception:
             continue
 
-    return {date: dict(models) for date, models in by_date.items()}
+    return {d: dict(models) for d, models in by_date.items()}
 
 
 def parse_task_categories() -> dict:
@@ -336,17 +392,8 @@ def parse_task_categories() -> dict:
     return {d: dict(cats) for d, cats in by_date.items()}
 
 
-def _parse_claude_for_date(target_date: str) -> dict:
-    """Return Claude Code usage for a single date."""
-    return parse_claude_logs().get(target_date, {})
-
-
 def parse_copilot_logs(target_date: str) -> dict:
-    """Read GitHub Copilot usage from VSCode storage."""
-    totals: dict = defaultdict(lambda: {
-        "input_tokens": 0, "output_tokens": 0,
-        "cache_read_tokens": 0, "cache_write_tokens": 0,
-    })
+    """Parse GitHub Copilot chat sessions with session + turn counts."""
     home = Path.home()
     if sys.platform == "win32":
         base_paths = [
@@ -358,7 +405,9 @@ def parse_copilot_logs(target_date: str) -> dict:
             home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "github.copilot-chat",
             home / ".config" / "Code" / "User" / "globalStorage" / "github.copilot-chat",
         ]
-    sessions = 0
+
+    sessions = []
+    total_turns = 0
     for base in base_paths:
         if not base.exists():
             continue
@@ -367,13 +416,33 @@ def parse_copilot_logs(target_date: str) -> dict:
                 mtime = datetime.date.fromtimestamp(f.stat().st_mtime).isoformat()
                 if mtime != target_date:
                     continue
-                sessions += 1
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                    turns = 0
+                    if isinstance(data, dict):
+                        turns = len(data.get("turns", data.get("messages", [])))
+                    elif isinstance(data, list):
+                        turns = len(data)
+                    total_turns += max(turns, 1)
+                except Exception:
+                    total_turns += 1
+                sessions.append(str(f))
             except Exception:
                 continue
-    if sessions > 0:
-        totals["copilot/auto"]["input_tokens"]  = sessions * 500
-        totals["copilot/auto"]["output_tokens"] = sessions * 250
-    return dict(totals) if sessions > 0 else {}
+
+    if not sessions:
+        return {}
+
+    return {
+        "copilot/auto": {
+            "input_tokens":       total_turns * 800,
+            "output_tokens":      total_turns * 400,
+            "cache_read_tokens":  0,
+            "cache_write_tokens": 0,
+            "sessions":           len(sessions),
+            "turns":              total_turns,
+        }
+    }
 
 
 def parse_cursor_logs(target_date: str) -> dict:
@@ -418,16 +487,18 @@ def parse_cursor_logs(target_date: str) -> dict:
 
 
 def parse_gemini_logs(target_date: str) -> dict:
-    """Read Gemini CLI usage logs."""
-    totals: dict = defaultdict(lambda: {
-        "input_tokens": 0, "output_tokens": 0,
-        "cache_read_tokens": 0, "cache_write_tokens": 0,
-    })
+    """Parse Gemini CLI logs with actual token counts and session tracking."""
     home = Path.home()
     if sys.platform == "win32":
         base_paths = [home / ".gemini" / "tmp", Path(os.environ.get("APPDATA", "")) / "gemini" / "tmp"]
     else:
         base_paths = [home / ".gemini" / "tmp"]
+
+    model_data: dict = defaultdict(lambda: {
+        "input_tokens": 0, "output_tokens": 0,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+        "sessions": set(), "turns": 0,
+    })
     for base in base_paths:
         if not base.exists():
             continue
@@ -445,11 +516,26 @@ def parse_gemini_logs(target_date: str) -> dict:
                     if not usage:
                         continue
                     model = entry.get("model", "gemini-2.0-flash")
-                    totals[model]["input_tokens"]  += usage.get("promptTokenCount", 0)
-                    totals[model]["output_tokens"] += usage.get("candidatesTokenCount", 0)
+                    model_data[model]["input_tokens"]  += usage.get("promptTokenCount", 0)
+                    model_data[model]["output_tokens"] += usage.get("candidatesTokenCount", 0)
+                    model_data[model]["sessions"].add(str(f))
+                    model_data[model]["turns"] += 1
             except Exception:
                 continue
-    return dict(totals)
+
+    result = {}
+    for model, data in model_data.items():
+        if data["input_tokens"] + data["output_tokens"] == 0:
+            continue
+        result[model] = {
+            "input_tokens":       data["input_tokens"],
+            "output_tokens":      data["output_tokens"],
+            "cache_read_tokens":  data["cache_read_tokens"],
+            "cache_write_tokens": data["cache_write_tokens"],
+            "sessions":           len(data["sessions"]),
+            "turns":              data["turns"],
+        }
+    return result
 
 
 def parse_windsurf_logs(target_date: str) -> dict:
@@ -570,7 +656,7 @@ def cmd_report(args):
         print(f"Scanning all AI tool logs...\n")
 
         tool_scanners = [
-            ("claude_code", _parse_claude_for_date),
+            ("claude_code", parse_claude_logs),
             ("copilot",     parse_copilot_logs),
             ("cursor",      parse_cursor_logs),
             ("gemini",      parse_gemini_logs),
@@ -604,6 +690,8 @@ def cmd_report(args):
                     "output_tokens":      usage["output_tokens"],
                     "cache_read_tokens":  usage["cache_read_tokens"],
                     "cache_write_tokens": usage["cache_write_tokens"],
+                    "sessions":           usage.get("sessions", 1),
+                    "turns":              usage.get("turns", 0),
                     "idempotency_key":    ikey,
                     "agent_version":      AGENT_VERSION,
                 }
@@ -619,17 +707,30 @@ def cmd_report(args):
                         print(f"  {tool_name}/{model}: ERROR — {e}")
 
             if tool_submitted > 0:
-                print(f"  ✓ {tool_name}: {tool_submitted} model(s) sent")
+                total_sessions = sum(
+                    v.get("sessions", 0) for v in usage_by_model.values()
+                )
+                print(
+                    f"  ✓ {tool_name}: "
+                    f"{total_sessions} sessions — "
+                    f"{tool_submitted} model(s) sent"
+                )
 
         if submitted == 0 and skipped == 0:
             print("No usage found for any tool today.")
-        else:
-            print(f"\nDone. {submitted} submitted, {skipped} already existed.")
+
+        print(f"\n{'─' * 50}")
+        print(f"  Report Summary — {target}")
+        print(f"{'─' * 50}")
+        print(f"  Submitted : {submitted} model records")
+        print(f"  Skipped   : {skipped} already existed")
+        print(f"  Server    : {server}")
+        print(f"{'─' * 50}\n")
 
     else:
         # ── All dates: Claude Code historical scan ───────────────────────
         print("Scanning Claude Code logs (all historical dates)...")
-        all_data = parse_claude_logs()
+        all_data = _parse_claude_logs_all()
 
         if not all_data:
             print("No Claude Code usage found in logs.")
