@@ -16257,7 +16257,18 @@ program.command("enroll").description("Connect to company server via email OTP")
   }
   const serverUrl = opts.server.replace(/\/$/, "");
   const machineId = getMachineId();
-  const TIMEOUT_MS = 45e3;
+  const TIMEOUT_MS = 9e4;
+  async function fetchWithRetry(url, init, retries = 3) {
+    for (let i = 1; i <= retries; i++) {
+      try {
+        return await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      } catch (e) {
+        if (i === retries) throw e;
+        console.log(source_default.dim(`  Server waking up... retrying (${i}/${retries - 1})`));
+      }
+    }
+    throw new Error("unreachable");
+  }
   console.log(source_default.bold("\n  Elliot AIOps \u2014 Device Enrollment\n"));
   const email = opts.email || await prompt("  Work email: ");
   if (!email.includes("@")) {
@@ -16265,11 +16276,10 @@ program.command("enroll").description("Connect to company server via email OTP")
     process.exit(1);
   }
   try {
-    const discoverRes = await fetch(serverUrl + "/enroll/discover", {
+    const discoverRes = await fetchWithRetry(serverUrl + "/enroll/discover", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-      signal: AbortSignal.timeout(TIMEOUT_MS)
+      body: JSON.stringify({ email })
     });
     if (discoverRes.ok) {
       const { allowed } = await discoverRes.json();
@@ -16281,13 +16291,12 @@ program.command("enroll").description("Connect to company server via email OTP")
   } catch {
     console.log(source_default.yellow("  Could not reach server to verify domain \u2014 continuing"));
   }
-  console.log(source_default.dim("\n  Sending one-time code to " + email + " (may take ~30s if server is waking up)..."));
+  console.log(source_default.dim("\n  Sending one-time code to " + email + "..."));
   try {
-    const otpRes = await fetch(serverUrl + "/enroll/send-otp", {
+    const otpRes = await fetchWithRetry(serverUrl + "/enroll/send-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-      signal: AbortSignal.timeout(TIMEOUT_MS)
+      body: JSON.stringify({ email })
     });
     if (!otpRes.ok) {
       const err = await otpRes.json().catch(() => ({}));
@@ -16295,8 +16304,7 @@ program.command("enroll").description("Connect to company server via email OTP")
       process.exit(1);
     }
   } catch (e) {
-    console.error(source_default.red("  Server unreachable: " + String(e)));
-    console.error(source_default.dim("  If this is the first request of the day, the server may need a minute to wake up. Try again."));
+    console.error(source_default.red("  Server unreachable after 3 attempts: " + String(e)));
     process.exit(1);
   }
   const code = await prompt("  Enter 6-digit code from your email: ");
@@ -16306,11 +16314,10 @@ program.command("enroll").description("Connect to company server via email OTP")
   }
   let enrollmentToken = "";
   try {
-    const verifyRes = await fetch(serverUrl + "/enroll/verify-otp", {
+    const verifyRes = await fetchWithRetry(serverUrl + "/enroll/verify-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code }),
-      signal: AbortSignal.timeout(TIMEOUT_MS)
+      body: JSON.stringify({ email, code })
     });
     if (!verifyRes.ok) {
       const err = await verifyRes.json().catch(() => ({}));
@@ -16325,7 +16332,7 @@ program.command("enroll").description("Connect to company server via email OTP")
   }
   let apiToken = "";
   try {
-    const enrollRes = await fetch(serverUrl + "/api/enroll", {
+    const enrollRes = await fetchWithRetry(serverUrl + "/api/enroll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -16333,8 +16340,7 @@ program.command("enroll").description("Connect to company server via email OTP")
         machine_id: machineId,
         hostname: import_os6.default.hostname(),
         os: process.platform
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS)
+      })
     });
     if (!enrollRes.ok) {
       const err = await enrollRes.json().catch(() => ({}));

@@ -1292,7 +1292,19 @@ program
 
     const serverUrl = opts.server.replace(/\/$/, '');
     const machineId = getMachineId();
-    const TIMEOUT_MS = 45_000; // Render free tier can take ~30s to cold-start
+    const TIMEOUT_MS = 90_000; // Render free tier cold-starts can exceed 60s
+
+    async function fetchWithRetry(url: string, init: RequestInit, retries = 3): Promise<Response> {
+      for (let i = 1; i <= retries; i++) {
+        try {
+          return await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+        } catch (e) {
+          if (i === retries) throw e;
+          console.log(chalk.dim(`  Server waking up... retrying (${i}/${retries - 1})`));
+        }
+      }
+      throw new Error('unreachable');
+    }
 
     console.log(chalk.bold('\n  Elliot AIOps — Device Enrollment\n'));
 
@@ -1305,11 +1317,10 @@ program
 
     // Step 2: check domain is allowed
     try {
-      const discoverRes = await fetch(serverUrl + '/enroll/discover', {
+      const discoverRes = await fetchWithRetry(serverUrl + '/enroll/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (discoverRes.ok) {
         const { allowed } = await discoverRes.json() as { allowed: boolean };
@@ -1322,14 +1333,13 @@ program
       console.log(chalk.yellow('  Could not reach server to verify domain — continuing'));
     }
 
-    // Step 3: request OTP (server may be cold-starting — wait up to 45s)
-    console.log(chalk.dim('\n  Sending one-time code to ' + email + ' (may take ~30s if server is waking up)...'));
+    // Step 3: request OTP — auto-retries up to 3 times if server is cold-starting
+    console.log(chalk.dim('\n  Sending one-time code to ' + email + '...'));
     try {
-      const otpRes = await fetch(serverUrl + '/enroll/send-otp', {
+      const otpRes = await fetchWithRetry(serverUrl + '/enroll/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!otpRes.ok) {
         const err = await otpRes.json().catch(() => ({})) as Record<string, unknown>;
@@ -1337,8 +1347,7 @@ program
         process.exit(1);
       }
     } catch (e) {
-      console.error(chalk.red('  Server unreachable: ' + String(e)));
-      console.error(chalk.dim('  If this is the first request of the day, the server may need a minute to wake up. Try again.'));
+      console.error(chalk.red('  Server unreachable after 3 attempts: ' + String(e)));
       process.exit(1);
     }
 
@@ -1352,11 +1361,10 @@ program
     // Step 5: verify OTP → enrollment_token
     let enrollmentToken = '';
     try {
-      const verifyRes = await fetch(serverUrl + '/enroll/verify-otp', {
+      const verifyRes = await fetchWithRetry(serverUrl + '/enroll/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!verifyRes.ok) {
         const err = await verifyRes.json().catch(() => ({})) as Record<string, unknown>;
@@ -1373,7 +1381,7 @@ program
     // Step 6: enroll device → api_token
     let apiToken = '';
     try {
-      const enrollRes = await fetch(serverUrl + '/api/enroll', {
+      const enrollRes = await fetchWithRetry(serverUrl + '/api/enroll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1382,7 +1390,6 @@ program
           hostname:         os.hostname(),
           os:               process.platform,
         }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!enrollRes.ok) {
         const err = await enrollRes.json().catch(() => ({})) as Record<string, unknown>;
