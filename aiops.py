@@ -15,8 +15,10 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import socket
 import sqlite3
+import struct
 import subprocess
 import sys
 import urllib.error
@@ -43,6 +45,33 @@ CLAUDE_DIR      = Path.home() / ".claude"
 PLIST_AM   = Path.home() / "Library" / "LaunchAgents" / "com.elliot.aiops.am.plist"
 PLIST_PM   = Path.home() / "Library" / "LaunchAgents" / "com.elliot.aiops.pm.plist"
 PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / "com.elliot.aiops.plist"  # legacy
+
+
+def _app_data() -> Path:
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", "")) or \
+               Path.home() / "AppData" / "Roaming"
+    elif sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    else:
+        return Path.home() / ".config"
+
+APP_DATA = _app_data()
+HOME     = Path.home()
+
+TOOL_PATHS = {
+    "claude":    HOME / ".claude" / "projects",
+    "gemini_tmp": HOME / ".gemini" / "tmp",
+    "gemini_antigravity": HOME / ".gemini" / "antigravity" / "conversations",
+    "cursor_db": APP_DATA / "Cursor" / "User" / "globalStorage" / "state.vscdb",
+    "windsurf_db": APP_DATA / "Windsurf" / "User" / "globalStorage" / "state.vscdb",
+    "cline_tasks": APP_DATA / "Code" / "User" / "globalStorage" / "saoudrizwan.claude-dev" / "tasks",
+    "roo_tasks":   APP_DATA / "Code" / "User" / "globalStorage" / "rooveterinaryinc.roo-cline" / "tasks",
+    "kilo_tasks":  APP_DATA / "Code" / "User" / "globalStorage" / "kilocode.kilo-code" / "tasks",
+    "copilot_workspace": APP_DATA / "Code" / "User" / "workspaceStorage",
+    "copilot_global":    APP_DATA / "Code" / "User" / "globalStorage" / "github.copilot-chat",
+    "codex_sessions": HOME / ".codex" / "sessions",
+}
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -105,6 +134,49 @@ def save_config(data: dict):
 
 def get_machine_id() -> str:
     return hashlib.sha256(socket.gethostname().encode()).hexdigest()
+
+PRICING = [
+    (r"claude-opus-4",        5.00,  25.00,  0.50,  6.25),
+    (r"claude-sonnet-4",      3.00,  15.00,  0.30,  3.75),
+    (r"claude-haiku-4",       1.00,   5.00,  0.10,  1.25),
+    (r"claude-3-7-sonnet",    3.00,  15.00,  0.30,  3.75),
+    (r"claude-3-5-sonnet",    3.00,  15.00,  0.30,  3.75),
+    (r"claude-3-5-haiku",     0.80,   4.00,  0.08,  1.00),
+    (r"claude-3-opus",       15.00,  75.00,  1.50, 18.75),
+    (r"claude-3-sonnet",      3.00,  15.00,  0.30,  3.75),
+    (r"claude-3-haiku",       0.25,   1.25,  0.03,  0.30),
+    (r"gemini-2\.5-pro",      1.25,  10.00,  0.00,  0.00),
+    (r"gemini-2\.5-flash",    0.15,   0.60,  0.00,  0.00),
+    (r"gemini-2\.0-flash",    0.075,  0.30,  0.02,  0.09),
+    (r"gemini-1\.5-flash",    0.075,  0.30,  0.02,  0.09),
+    (r"gemini-1\.5-pro",      1.25,   5.00,  0.00,  0.00),
+    (r"gemini",               0.075,  0.30,  0.00,  0.00),
+    (r"gpt-4\.1-nano",        0.10,   0.40,  0.00,  0.00),
+    (r"gpt-4\.1-mini",        0.40,   1.60,  0.00,  0.00),
+    (r"gpt-4\.1",             2.00,   8.00,  0.00,  0.00),
+    (r"gpt-4o-mini",          0.15,   0.60,  0.075, 0.00),
+    (r"gpt-4o",               2.50,  10.00,  0.63,  3.13),
+    (r"gpt-4-turbo",         10.00,  30.00,  0.00,  0.00),
+    (r"gpt-4",               10.00,  30.00,  0.00,  0.00),
+    (r"gpt-3\.5-turbo",       0.50,   1.50,  0.00,  0.00),
+    (r"o4-mini",              1.10,   4.40,  0.28,  0.00),
+    (r"o3-mini",              1.10,   4.40,  0.28,  0.00),
+    (r"o3",                  10.00,  40.00,  2.50,  0.00),
+    (r"o1-mini",              3.00,  12.00,  0.75,  0.00),
+    (r"\bo1\b",              15.00,  60.00,  3.75,  0.00),
+]
+
+def calc_cost(model: str, inp: int, out: int,
+              cache_read: int = 0, cache_write: int = 0) -> float:
+    model_lower = (model or "").lower()
+    for pattern, p_in, p_out, p_cr, p_cw in PRICING:
+        if re.search(pattern, model_lower):
+            cost = (inp * p_in + out * p_out +
+                    cache_read * p_cr +
+                    cache_write * p_cw) / 1_000_000
+            return round(cost, 6)
+    return 0.0
+
 
 def _print_network_error(err: str):
     print(f"\n  ERROR: {err}\n")
@@ -253,23 +325,21 @@ def _classify_session(tool_uses: list) -> str:
 
 
 def parse_claude_logs(target_date: str) -> dict:
-    """
-    Parse Claude Code logs for a single date, grouped by session.
-    Returns: { model: { input_tokens, output_tokens, cache_*, sessions, turns } }
-    """
-    model_data: dict = defaultdict(lambda: {
-        "input_tokens": 0, "output_tokens": 0,
-        "cache_read_tokens": 0, "cache_write_tokens": 0,
-        "sessions": set(),
-        "turns": 0,
-    })
-    projects_dir = CLAUDE_DIR / "projects"
+    """Parse Claude Code logs counting individual sessions."""
+    model_data: dict = {}
+    projects_dir = TOOL_PATHS["claude"]
+
     if not projects_dir.exists():
         return {}
 
     for jsonl_file in projects_dir.rglob("*.jsonl"):
         try:
-            content = jsonl_file.read_text(encoding="utf-8").replace("\r\n", "\n")
+            content = jsonl_file.read_text(
+                encoding="utf-8", errors="replace"
+            ).replace("\r\n", "\n")
+
+            session_id = str(jsonl_file)
+
             for line in content.splitlines():
                 line = line.strip()
                 if not line or not line.startswith("{"):
@@ -278,22 +348,41 @@ def parse_claude_logs(target_date: str) -> dict:
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+
                 if entry.get("type") != "assistant":
                     continue
+
                 ts = entry.get("timestamp", "")
-                if not ts.startswith(target_date):
+                if not str(ts).startswith(target_date):
                     continue
+
                 msg   = entry.get("message", {})
                 usage = msg.get("usage")
                 if not usage:
                     continue
+
                 model = msg.get("model", "unknown") or "unknown"
-                model_data[model]["input_tokens"]       += usage.get("input_tokens", 0)
-                model_data[model]["output_tokens"]      += usage.get("output_tokens", 0)
-                model_data[model]["cache_read_tokens"]  += usage.get("cache_read_input_tokens", 0)
-                model_data[model]["cache_write_tokens"] += usage.get("cache_creation_input_tokens", 0)
-                model_data[model]["sessions"].add(str(jsonl_file))
+                if model not in model_data:
+                    model_data[model] = {
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 0,
+                        "sessions": set(),
+                        "turns": 0,
+                    }
+
+                model_data[model]["input_tokens"] += \
+                    usage.get("input_tokens", 0)
+                model_data[model]["output_tokens"] += \
+                    usage.get("output_tokens", 0)
+                model_data[model]["cache_read_tokens"] += \
+                    usage.get("cache_read_input_tokens", 0)
+                model_data[model]["cache_write_tokens"] += \
+                    usage.get("cache_creation_input_tokens", 0)
+                model_data[model]["sessions"].add(session_id)
                 model_data[model]["turns"] += 1
+
         except Exception:
             continue
 
@@ -393,227 +482,732 @@ def parse_task_categories() -> dict:
 
 
 def parse_copilot_logs(target_date: str) -> dict:
-    """Parse GitHub Copilot chat sessions with session + turn counts."""
-    home = Path.home()
-    if sys.platform == "win32":
-        base_paths = [
-            Path(os.environ.get("APPDATA", "")) / "Code" / "User" / "globalStorage" / "github.copilot-chat",
-            Path(os.environ.get("APPDATA", "")) / "Code - Insiders" / "User" / "globalStorage" / "github.copilot-chat",
-        ]
-    else:
-        base_paths = [
-            home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "github.copilot-chat",
-            home / ".config" / "Code" / "User" / "globalStorage" / "github.copilot-chat",
-        ]
+    """
+    Parse GitHub Copilot sessions.
+    Reads chatSessions JSON files from workspace storage.
+    Also reads state.vscdb for VS Code 1.100+.
+    """
+    workspace_root = TOOL_PATHS["copilot_workspace"]
+    global_storage = TOOL_PATHS["copilot_global"]
+
+    if not workspace_root.exists() and \
+       not global_storage.exists():
+        return {}
 
     sessions = []
-    total_turns = 0
-    for base in base_paths:
-        if not base.exists():
-            continue
-        for f in base.rglob("*.json"):
-            try:
-                mtime = datetime.date.fromtimestamp(f.stat().st_mtime).isoformat()
-                if mtime != target_date:
+
+    # Method 1: Read chatSessions JSON files
+    if workspace_root.exists():
+        try:
+            for ws_dir in workspace_root.iterdir():
+                if not ws_dir.is_dir():
                     continue
-                try:
-                    data = json.loads(f.read_text(encoding="utf-8"))
-                    turns = 0
-                    if isinstance(data, dict):
-                        turns = len(data.get("turns", data.get("messages", [])))
-                    elif isinstance(data, list):
-                        turns = len(data)
-                    total_turns += max(turns, 1)
-                except Exception:
-                    total_turns += 1
-                sessions.append(str(f))
-            except Exception:
-                continue
+                chat_dir = ws_dir / "chatSessions"
+                if not chat_dir.exists():
+                    continue
+                for f in chat_dir.glob("*.json"):
+                    try:
+                        data = json.loads(
+                            f.read_text(encoding="utf-8")
+                        )
+                        if not isinstance(data, dict):
+                            continue
+                        requests = data.get("requests", [])
+                        if not requests:
+                            continue
+
+                        is_copilot = any(
+                            "github.copilot" in str(
+                                r.get("agent", {})
+                                 .get("extensionId", {})
+                                 .get("value", "")
+                            ).lower()
+                            for r in requests
+                            if isinstance(r, dict)
+                        )
+                        if not is_copilot:
+                            continue
+
+                        first_ts = data.get("creationDate", 0)
+                        if first_ts:
+                            ts_ms = int(first_ts)
+                            file_date = datetime.datetime.fromtimestamp(
+                                ts_ms / 1000
+                            ).strftime("%Y-%m-%d")
+                        else:
+                            file_date = datetime.date.fromtimestamp(
+                                f.stat().st_mtime
+                            ).isoformat()
+
+                        if file_date != target_date:
+                            continue
+
+                        input_tokens  = 0
+                        output_tokens = 0
+                        model = "copilot/auto"
+                        turns = 0
+
+                        for r in requests:
+                            if not isinstance(r, dict):
+                                continue
+                            user_text = str(
+                                r.get("message", {})
+                                 .get("text", "")
+                            )
+                            input_tokens  += len(user_text) // 4
+                            output_tokens += len(user_text) // 8
+                            if r.get("result", {}).get("details"):
+                                model = r["result"]["details"]\
+                                    .split("•")[0].strip() \
+                                    or model
+                            turns += 1
+
+                        sessions.append({
+                            "model":              model or "copilot/auto",
+                            "input_tokens":       input_tokens,
+                            "output_tokens":      output_tokens,
+                            "cache_read_tokens":  0,
+                            "cache_write_tokens": 0,
+                            "session_id":         str(f),
+                            "turns":              turns,
+                        })
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+    # Method 2: Read state.vscdb (VS Code 1.100+)
+    global_db = global_storage.parent / "state.vscdb"
+    db_paths = []
+    if global_db.exists():
+        db_paths.append(global_db)
+
+    if workspace_root.exists():
+        try:
+            for ws_dir in workspace_root.iterdir():
+                db = ws_dir / "state.vscdb"
+                if db.exists():
+                    db_paths.append(db)
+        except Exception:
+            pass
+
+    for db_path in db_paths:
+        try:
+            conn = sqlite3.connect(
+                f"file:{db_path}?mode=ro", uri=True,
+                timeout=3
+            )
+            try:
+                row = conn.execute(
+                    "SELECT value FROM ItemTable "
+                    "WHERE key = 'chat.ChatSessionStore.index'"
+                ).fetchone()
+                if not row:
+                    continue
+                idx = json.loads(row[0])
+                entries = idx.get("entries", {})
+                if isinstance(entries, dict):
+                    entries = list(entries.values())
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("isEmpty") is not False:
+                        continue
+                    created = entry.get("timing", {}) \
+                                   .get("created", 0) or \
+                              entry.get("lastMessageDate", 0)
+                    if not created:
+                        continue
+                    entry_date = datetime.datetime.fromtimestamp(
+                        int(created) / 1000
+                    ).strftime("%Y-%m-%d")
+                    if entry_date != target_date:
+                        continue
+                    sessions.append({
+                        "model":              "copilot/auto",
+                        "input_tokens":       0,
+                        "output_tokens":      0,
+                        "cache_read_tokens":  0,
+                        "cache_write_tokens": 0,
+                        "session_id":         entry.get(
+                            "sessionId", str(db_path)
+                        ),
+                        "turns": 1,
+                    })
+            finally:
+                conn.close()
+        except Exception:
+            continue
 
     if not sessions:
         return {}
 
-    return {
-        "copilot/auto": {
-            "input_tokens":       total_turns * 800,
-            "output_tokens":      total_turns * 400,
-            "cache_read_tokens":  0,
-            "cache_write_tokens": 0,
-            "sessions":           len(sessions),
-            "turns":              total_turns,
-        }
-    }
+    model_data: dict = {}
+    seen_sessions: set = set()
+    for s in sessions:
+        sid = s["session_id"]
+        if sid in seen_sessions:
+            continue
+        seen_sessions.add(sid)
+        model = s["model"]
+        if model not in model_data:
+            model_data[model] = {
+                "input_tokens": 0, "output_tokens": 0,
+                "cache_read_tokens": 0, "cache_write_tokens": 0,
+                "sessions": 0, "turns": 0,
+            }
+        model_data[model]["input_tokens"]  += s["input_tokens"]
+        model_data[model]["output_tokens"] += s["output_tokens"]
+        model_data[model]["sessions"]      += 1
+        model_data[model]["turns"]         += s["turns"]
+
+    return model_data
 
 
 def parse_cursor_logs(target_date: str) -> dict:
-    """Read Cursor AI usage from SQLite storage."""
-    totals: dict = defaultdict(lambda: {
-        "input_tokens": 0, "output_tokens": 0,
-        "cache_read_tokens": 0, "cache_write_tokens": 0,
-    })
-    home = Path.home()
-    if sys.platform == "win32":
-        db_paths = [Path(os.environ.get("APPDATA", "")) / "Cursor" / "User" / "globalStorage" / "state.vscdb"]
-    else:
-        db_paths = [
-            home / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb",
-            home / ".config" / "Cursor" / "User" / "globalStorage" / "state.vscdb",
-        ]
-    for db_path in db_paths:
-        if not db_path.exists():
-            continue
+    """
+    Parse Cursor AI sessions from state.vscdb SQLite file.
+    Reads composerData entries from cursorDiskKV table.
+    """
+    db_path = TOOL_PATHS["cursor_db"]
+    if not db_path.exists():
+        return {}
+
+    model_data: dict = {}
+
+    try:
+        conn = sqlite3.connect(
+            f"file:{db_path}?mode=ro", uri=True,
+            timeout=3
+        )
         try:
-            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-            c = conn.cursor()
-            c.execute("SELECT value FROM ItemTable WHERE key LIKE '%composer%' OR key LIKE '%aichat%'")
-            rows = c.fetchall()
-            conn.close()
-            for row in rows:
+            tables = [
+                r[0] for r in conn.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table'"
+                ).fetchall()
+            ]
+            if "cursorDiskKV" not in tables:
+                return {}
+
+            rows = conn.execute(
+                "SELECT key, value FROM cursorDiskKV "
+                "WHERE key LIKE 'composerData:%'"
+            ).fetchall()
+
+            for key, value in rows:
                 try:
-                    data = json.loads(row[0])
+                    data = json.loads(value)
                     if not isinstance(data, dict):
                         continue
-                    ts = str(data.get("createdAt", data.get("timestamp", "")))
-                    if not ts.startswith(target_date):
+
+                    composer_id = key.replace(
+                        "composerData:", ""
+                    )
+
+                    created_at = data.get("createdAt", 0)
+                    if created_at:
+                        entry_date = datetime.datetime\
+                            .fromtimestamp(
+                                int(created_at) / 1000
+                                if int(created_at) > 1e10
+                                else int(created_at)
+                            ).strftime("%Y-%m-%d")
+                        if entry_date != target_date:
+                            continue
+
+                    model      = ""
+                    inp        = 0
+                    out        = 0
+                    turns      = 0
+                    has_tokens = False
+
+                    bubble_rows = conn.execute(
+                        "SELECT value FROM cursorDiskKV "
+                        "WHERE key LIKE ?",
+                        (f"bubbleId:{composer_id}:%",)
+                    ).fetchall()
+
+                    for (bval,) in bubble_rows:
+                        try:
+                            b = json.loads(bval)
+                            if not isinstance(b, dict):
+                                continue
+                            btype = int(b.get("type", -1))
+                            if btype == 1:
+                                turns += 1
+                                if not model:
+                                    mi = b.get("modelInfo", {})
+                                    if isinstance(mi, dict):
+                                        model = str(
+                                            mi.get(
+                                                "modelName", ""
+                                            )
+                                        )
+                                tc = b.get("tokenCount", {})
+                                if isinstance(tc, dict):
+                                    i = int(tc.get(
+                                        "inputTokens",
+                                        tc.get("input_tokens", 0)
+                                    ))
+                                    o = int(tc.get(
+                                        "outputTokens",
+                                        tc.get("output_tokens", 0)
+                                    ))
+                                    if i > 0 or o > 0:
+                                        has_tokens = True
+                                        inp += i
+                                        out += o
+                        except Exception:
+                            continue
+
+                    if turns == 0:
                         continue
-                    model = data.get("model", "gpt-4o")
-                    totals[model]["input_tokens"]  += data.get("inputTokens", data.get("promptTokens", 0))
-                    totals[model]["output_tokens"] += data.get("outputTokens", data.get("completionTokens", 0))
+
+                    if not model:
+                        mc = data.get("modelConfig", {})
+                        if isinstance(mc, dict):
+                            model = str(
+                                mc.get("modelName", "")
+                            )
+                    model = model or "cursor"
+
+                    if model not in model_data:
+                        model_data[model] = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "cache_read_tokens": 0,
+                            "cache_write_tokens": 0,
+                            "sessions": 0, "turns": 0,
+                        }
+                    model_data[model]["input_tokens"]  += inp
+                    model_data[model]["output_tokens"] += out
+                    model_data[model]["sessions"]      += 1
+                    model_data[model]["turns"]         += turns
+
                 except Exception:
                     continue
-        except Exception:
-            continue
-    return dict(totals)
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+    return model_data
 
 
 def parse_gemini_logs(target_date: str) -> dict:
-    """Parse Gemini CLI logs with actual token counts and session tracking."""
-    home = Path.home()
-    if sys.platform == "win32":
-        base_paths = [home / ".gemini" / "tmp", Path(os.environ.get("APPDATA", "")) / "gemini" / "tmp"]
-    else:
-        base_paths = [home / ".gemini" / "tmp"]
+    """
+    Parse Gemini CLI logs.
+    Reads .jsonl files from ~/.gemini/tmp/
+    Also reads .pb files from antigravity folder.
+    """
+    model_data: dict = {}
 
-    model_data: dict = defaultdict(lambda: {
-        "input_tokens": 0, "output_tokens": 0,
-        "cache_read_tokens": 0, "cache_write_tokens": 0,
-        "sessions": set(), "turns": 0,
-    })
-    for base in base_paths:
-        if not base.exists():
-            continue
-        for f in base.rglob("*.json"):
+    # Method 1: JSONL files in tmp
+    tmp_dir = TOOL_PATHS["gemini_tmp"]
+    if tmp_dir.exists():
+        for f in tmp_dir.rglob("*.jsonl"):
             try:
-                mtime = datetime.date.fromtimestamp(f.stat().st_mtime).isoformat()
-                if mtime != target_date:
+                mtime_date = datetime.date.fromtimestamp(
+                    f.stat().st_mtime
+                ).isoformat()
+                if mtime_date != target_date:
                     continue
-                data = json.loads(f.read_text(encoding="utf-8"))
-                entries = data if isinstance(data, list) else [data]
-                for entry in entries:
-                    if not isinstance(entry, dict):
+
+                content = f.read_text(
+                    encoding="utf-8", errors="replace"
+                ).replace("\r\n", "\n")
+
+                model      = ""
+                inp        = 0
+                out        = 0
+                cache_read = 0
+                turns      = 0
+                has_usage  = False
+
+                for line in content.splitlines():
+                    line = line.strip()
+                    if not line:
                         continue
-                    usage = entry.get("usageMetadata", {})
-                    if not usage:
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
                         continue
-                    model = entry.get("model", "gemini-2.0-flash")
-                    model_data[model]["input_tokens"]  += usage.get("promptTokenCount", 0)
-                    model_data[model]["output_tokens"] += usage.get("candidatesTokenCount", 0)
-                    model_data[model]["sessions"].add(str(f))
-                    model_data[model]["turns"] += 1
+
+                    if not model:
+                        m = entry.get("modelVersion") or \
+                            entry.get("model", "")
+                        if m:
+                            model = str(m)
+
+                    role = str(
+                        entry.get("role", entry.get("type", ""))
+                    )
+                    if role in ("assistant", "model"):
+                        turns += 1
+
+                    meta = entry.get("usageMetadata")
+                    if meta and isinstance(meta, dict):
+                        has_usage = True
+                        inp        += int(meta.get(
+                            "promptTokenCount",
+                            meta.get("input_tokens", 0)
+                        ))
+                        out        += int(meta.get(
+                            "candidatesTokenCount",
+                            meta.get("output_tokens", 0)
+                        ))
+                        cache_read += int(meta.get(
+                            "cachedContentTokenCount", 0
+                        ))
+
+                if not has_usage:
+                    total_chars = len(content)
+                    inp = int(total_chars * 0.6 / 4)
+                    out = int(total_chars * 0.4 / 4)
+
+                model = model or "gemini-2.0-flash"
+                if model not in model_data:
+                    model_data[model] = {
+                        "input_tokens": 0, "output_tokens": 0,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 0,
+                        "sessions": 0, "turns": 0,
+                    }
+                model_data[model]["input_tokens"]      += inp
+                model_data[model]["output_tokens"]     += out
+                model_data[model]["cache_read_tokens"] += cache_read
+                model_data[model]["sessions"]          += 1
+                model_data[model]["turns"]             += turns
             except Exception:
                 continue
 
-    result = {}
-    for model, data in model_data.items():
-        if data["input_tokens"] + data["output_tokens"] == 0:
-            continue
-        result[model] = {
-            "input_tokens":       data["input_tokens"],
-            "output_tokens":      data["output_tokens"],
-            "cache_read_tokens":  data["cache_read_tokens"],
-            "cache_write_tokens": data["cache_write_tokens"],
-            "sessions":           len(data["sessions"]),
-            "turns":              data["turns"],
-        }
-    return result
-
-
-def parse_windsurf_logs(target_date: str) -> dict:
-    """Read Windsurf AI usage from storage."""
-    totals: dict = defaultdict(lambda: {
-        "input_tokens": 0, "output_tokens": 0,
-        "cache_read_tokens": 0, "cache_write_tokens": 0,
-    })
-    home = Path.home()
-    if sys.platform == "win32":
-        db_paths = [Path(os.environ.get("APPDATA", "")) / "Windsurf" / "User" / "globalStorage" / "state.vscdb"]
-    else:
-        db_paths = [
-            home / "Library" / "Application Support" / "Windsurf" / "User" / "globalStorage" / "state.vscdb",
-            home / ".config" / "Windsurf" / "User" / "globalStorage" / "state.vscdb",
-        ]
-    for db_path in db_paths:
-        if not db_path.exists():
-            continue
+    # Method 2: Antigravity .pb files (binary — estimate size)
+    ag_dir = TOOL_PATHS["gemini_antigravity"]
+    if ag_dir.exists():
         try:
-            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-            c = conn.cursor()
-            c.execute("SELECT value FROM ItemTable WHERE key LIKE '%chat%' OR key LIKE '%cascade%'")
-            rows = c.fetchall()
-            conn.close()
-            for row in rows:
+            for f in ag_dir.glob("*.pb"):
                 try:
-                    data = json.loads(row[0])
-                    if not isinstance(data, dict):
+                    mtime_date = datetime.date.fromtimestamp(
+                        f.stat().st_mtime
+                    ).isoformat()
+                    if mtime_date != target_date:
                         continue
-                    ts = str(data.get("timestamp", ""))
-                    if not ts.startswith(target_date):
-                        continue
-                    model = data.get("model", "windsurf")
-                    totals[model]["input_tokens"]  += data.get("inputTokens", 100)
-                    totals[model]["output_tokens"] += data.get("outputTokens", 50)
+                    size   = f.stat().st_size
+                    est    = size // 5
+                    inp    = int(est * 0.6)
+                    out    = int(est * 0.4)
+                    model  = "gemini-antigravity"
+                    if model not in model_data:
+                        model_data[model] = {
+                            "input_tokens": 0, "output_tokens": 0,
+                            "cache_read_tokens": 0,
+                            "cache_write_tokens": 0,
+                            "sessions": 0, "turns": 0,
+                        }
+                    model_data[model]["input_tokens"]  += inp
+                    model_data[model]["output_tokens"] += out
+                    model_data[model]["sessions"]      += 1
                 except Exception:
                     continue
         except Exception:
+            pass
+
+    return model_data
+
+
+def parse_windsurf_logs(target_date: str) -> dict:
+    """
+    Parse Windsurf sessions from state.vscdb.
+    Reads chat.ChatSessionStore.index from ItemTable.
+    """
+    db_path = TOOL_PATHS["windsurf_db"]
+    if not db_path.exists():
+        return {}
+
+    model_data: dict = {}
+
+    try:
+        conn = sqlite3.connect(
+            f"file:{db_path}?mode=ro", uri=True,
+            timeout=3
+        )
+        try:
+            tables = [
+                r[0] for r in conn.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table'"
+                ).fetchall()
+            ]
+            if "ItemTable" not in tables:
+                return {}
+
+            row = conn.execute(
+                "SELECT value FROM ItemTable "
+                "WHERE key = 'chat.ChatSessionStore.index'"
+            ).fetchone()
+
+            if not row:
+                return {}
+
+            index = json.loads(row[0])
+            sessions_list = (
+                index.get("entries") or
+                index.get("sessions") or
+                index.get("chatSessions") or
+                (index if isinstance(index, list) else [])
+            )
+
+            if isinstance(sessions_list, dict):
+                sessions_list = list(sessions_list.values())
+
+            for s in sessions_list:
+                if not isinstance(s, dict):
+                    continue
+                ts = (
+                    s.get("createdAt") or
+                    s.get("lastUpdated") or
+                    s.get("timestamp") or 0
+                )
+                if ts:
+                    ts_int = int(ts)
+                    if ts_int > 1e10:
+                        ts_int = ts_int // 1000
+                    entry_date = datetime.datetime\
+                        .fromtimestamp(ts_int)\
+                        .strftime("%Y-%m-%d")
+                    if entry_date != target_date:
+                        continue
+
+                inp = int(
+                    s.get("inputTokens") or
+                    s.get("tokensIn") or
+                    s.get("input_tokens") or 0
+                )
+                out = int(
+                    s.get("outputTokens") or
+                    s.get("tokensOut") or
+                    s.get("output_tokens") or 0
+                )
+
+                if inp == 0 and out == 0:
+                    text = json.dumps(s)
+                    inp  = len(text) // 4
+                    out  = len(text) // 10
+
+                model = str(
+                    s.get("model") or
+                    s.get("modelId") or
+                    "windsurf"
+                )
+                turns = int(
+                    s.get("turns") or
+                    s.get("turnCount") or 1
+                )
+
+                if model not in model_data:
+                    model_data[model] = {
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 0,
+                        "sessions": 0, "turns": 0,
+                    }
+                model_data[model]["input_tokens"]  += inp
+                model_data[model]["output_tokens"] += out
+                model_data[model]["sessions"]      += 1
+                model_data[model]["turns"]         += turns
+
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+    return model_data
+
+
+def parse_cline_family_logs(
+    target_date: str,
+    tasks_dir: Path,
+    tool_name: str
+) -> dict:
+    """
+    Parse Cline/Roo/Kilo tasks.
+    Reads ui_messages.json from each task directory.
+    """
+    if not tasks_dir.exists():
+        return {}
+
+    model_data: dict = {}
+
+    try:
+        task_dirs = [
+            d for d in tasks_dir.iterdir()
+            if d.is_dir()
+        ]
+    except Exception:
+        return {}
+
+    for td in task_dirs:
+        try:
+            td_date = datetime.date.fromtimestamp(
+                td.stat().st_mtime
+            ).isoformat()
+            if td_date != target_date:
+                continue
+
+            ui_msgs_path = td / "ui_messages.json"
+            if not ui_msgs_path.exists():
+                continue
+
+            try:
+                ui_messages = json.loads(
+                    ui_msgs_path.read_text(encoding="utf-8")
+                )
+            except Exception:
+                continue
+
+            if not isinstance(ui_messages, list):
+                continue
+
+            model       = ""
+            inp         = 0
+            out         = 0
+            cache_read  = 0
+            cache_write = 0
+            turns       = 0
+            cost_usd    = 0.0
+            has_tokens  = False
+            has_cost    = False
+
+            for m in ui_messages:
+                if not isinstance(m, dict):
+                    continue
+
+                if not model:
+                    if m.get("model"):
+                        model = str(m["model"])
+                    elif isinstance(m.get("modelInfo"), dict):
+                        model = str(
+                            m["modelInfo"].get("modelId", "")
+                        )
+
+                if (m.get("type") == "say" and
+                    m.get("say") == "api_req_started" and
+                    m.get("text")):
+                    try:
+                        p = json.loads(str(m["text"]))
+                        if not model and p.get("model"):
+                            model = str(p["model"])
+
+                        def _tok(key, *fb):
+                            for k in [key] + list(fb):
+                                v = p.get(k)
+                                if v is not None:
+                                    try:
+                                        n = int(v)
+                                        if n >= 0:
+                                            return n
+                                    except Exception:
+                                        pass
+                            return 0
+
+                        i  = _tok("tokensIn", "inputTokens",
+                                  "input_tokens",
+                                  "promptTokenCount")
+                        o  = _tok("tokensOut", "outputTokens",
+                                  "output_tokens",
+                                  "candidatesTokenCount")
+                        cr = _tok("cacheReads",
+                                  "cacheReadTokens",
+                                  "cache_read_input_tokens")
+                        cw = _tok("cacheWrites",
+                                  "cacheWriteTokens",
+                                  "cache_creation_input_tokens")
+
+                        if i > 0 or o > 0:
+                            has_tokens   = True
+                            inp         += i
+                            out         += o
+                            cache_read  += cr
+                            cache_write += cw
+                            turns       += 1
+
+                        tc = p.get("totalCost") or \
+                             p.get("cost")
+                        if tc is not None:
+                            try:
+                                tc_f = float(tc)
+                                if tc_f > 0:
+                                    has_cost  = True
+                                    cost_usd += tc_f
+                            except Exception:
+                                pass
+                    except Exception:
+                        continue
+
+            # Fallback: read history_item.json
+            if not has_tokens and not has_cost:
+                hist_path = td / "history_item.json"
+                if hist_path.exists():
+                    try:
+                        hist = json.loads(
+                            hist_path.read_text(encoding="utf-8")
+                        )
+                        if isinstance(hist, dict):
+                            i = hist.get("tokensIn", 0)
+                            o = hist.get("tokensOut", 0)
+                            c = hist.get("totalCost", 0)
+                            if i and int(i) > 0:
+                                inp        = int(i)
+                                out        = int(o or 0)
+                                has_tokens = True
+                            if c and float(c) > 0:
+                                cost_usd = float(c)
+                                has_cost = True
+                    except Exception:
+                        pass
+
+            if inp + out == 0 and not has_cost:
+                continue
+
+            if not model:
+                model = "unknown"
+
+            if model not in model_data:
+                model_data[model] = {
+                    "input_tokens": 0, "output_tokens": 0,
+                    "cache_read_tokens": 0,
+                    "cache_write_tokens": 0,
+                    "sessions": 0, "turns": 0,
+                }
+            model_data[model]["input_tokens"]       += inp
+            model_data[model]["output_tokens"]      += out
+            model_data[model]["cache_read_tokens"]  += cache_read
+            model_data[model]["cache_write_tokens"] += cache_write
+            model_data[model]["sessions"]           += 1
+            model_data[model]["turns"]              += turns
+
+        except Exception:
             continue
-    return dict(totals)
+
+    return model_data
 
 
 def parse_cline_logs(target_date: str) -> dict:
-    """Read Cline (Claude Dev) usage from VSCode storage."""
-    totals: dict = defaultdict(lambda: {
-        "input_tokens": 0, "output_tokens": 0,
-        "cache_read_tokens": 0, "cache_write_tokens": 0,
-    })
-    home = Path.home()
-    if sys.platform == "win32":
-        base_paths = [
-            Path(os.environ.get("APPDATA", "")) / "Code" / "User" / "globalStorage" / "saoudrizwan.claude-dev" / "tasks",
-        ]
-    else:
-        base_paths = [
-            home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "saoudrizwan.claude-dev" / "tasks",
-            home / ".config" / "Code" / "User" / "globalStorage" / "saoudrizwan.claude-dev" / "tasks",
-        ]
-    for base in base_paths:
-        if not base.exists():
-            continue
-        for f in base.rglob("*.json"):
-            try:
-                mtime = datetime.date.fromtimestamp(f.stat().st_mtime).isoformat()
-                if mtime != target_date:
-                    continue
-                data = json.loads(f.read_text(encoding="utf-8"))
-                if not isinstance(data, dict):
-                    continue
-                model = data.get("model", "claude-sonnet-4-5")
-                totals[model]["input_tokens"]       += data.get("tokensIn", 0)
-                totals[model]["output_tokens"]      += data.get("tokensOut", 0)
-                totals[model]["cache_read_tokens"]  += data.get("cacheReads", 0)
-                totals[model]["cache_write_tokens"] += data.get("cacheWrites", 0)
-            except Exception:
-                continue
-    return dict(totals)
+    return parse_cline_family_logs(
+        target_date, TOOL_PATHS["cline_tasks"], "cline"
+    )
+
+def parse_roo_logs(target_date: str) -> dict:
+    return parse_cline_family_logs(
+        target_date, TOOL_PATHS["roo_tasks"], "roo"
+    )
+
+def parse_kilo_logs(target_date: str) -> dict:
+    return parse_cline_family_logs(
+        target_date, TOOL_PATHS["kilo_tasks"], "kilo"
+    )
 
 
 def _ensure_scheduler_up_to_date():
@@ -658,74 +1252,86 @@ def cmd_report(args):
         tool_scanners = [
             ("claude_code", parse_claude_logs),
             ("copilot",     parse_copilot_logs),
-            ("cursor",      parse_cursor_logs),
             ("gemini",      parse_gemini_logs),
-            ("windsurf",    parse_windsurf_logs),
             ("cline",       parse_cline_logs),
+            ("roo",         parse_roo_logs),
+            ("kilo",        parse_kilo_logs),
+            ("cursor",      parse_cursor_logs),
+            ("windsurf",    parse_windsurf_logs),
         ]
+
+        tool_count = 0
 
         for tool_name, scanner in tool_scanners:
             try:
                 usage_by_model = scanner(target)
             except Exception as e:
-                print(f"  {tool_name}: scan error — {e}")
                 continue
 
             if not usage_by_model:
                 continue
 
             tool_submitted = 0
+            total_sessions = 0
+
             for model, usage in usage_by_model.items():
-                if usage["input_tokens"] + usage["output_tokens"] == 0:
+                if usage.get("input_tokens", 0) + \
+                   usage.get("output_tokens", 0) == 0 and \
+                   usage.get("sessions", 0) == 0:
                     continue
+
                 ikey = hashlib.sha256(
-                    f"{device_id}:{target}:{tool_name}:{model}".encode()
+                    f"{device_id}:{target}:{tool_name}:{model}"
+                    .encode()
                 ).hexdigest()[:64]
+
                 payload = {
                     "device_id":          device_id,
                     "date":               target,
                     "tool":               tool_name,
                     "model":              model,
-                    "input_tokens":       usage["input_tokens"],
-                    "output_tokens":      usage["output_tokens"],
-                    "cache_read_tokens":  usage["cache_read_tokens"],
-                    "cache_write_tokens": usage["cache_write_tokens"],
-                    "sessions":           usage.get("sessions", 1),
-                    "turns":              usage.get("turns", 0),
+                    "input_tokens":       usage.get("input_tokens", 0),
+                    "output_tokens":      usage.get("output_tokens", 0),
+                    "cache_read_tokens":  usage.get("cache_read_tokens", 0),
+                    "cache_write_tokens": usage.get("cache_write_tokens", 0),
                     "idempotency_key":    ikey,
                     "agent_version":      AGENT_VERSION,
                 }
+
                 try:
-                    post(server, "/telemetry/daily-rollup", payload)
+                    resp = post(
+                        server,
+                        "/telemetry/daily-rollup",
+                        payload
+                    )
                     tool_submitted += 1
-                    submitted += 1
+                    submitted      += 1
+                    total_sessions += usage.get("sessions", 0)
                 except RuntimeError as e:
                     err = str(e)
-                    if "already_exists" in err or "duplicate" in err.lower():
+                    if "already_exists" in err or \
+                       "duplicate" in err.lower() or \
+                       "409" in err:
                         skipped += 1
                     else:
                         print(f"  {tool_name}/{model}: ERROR — {e}")
 
             if tool_submitted > 0:
-                total_sessions = sum(
-                    v.get("sessions", 0) for v in usage_by_model.values()
-                )
+                tool_count += 1
                 print(
                     f"  ✓ {tool_name}: "
                     f"{total_sessions} sessions — "
                     f"{tool_submitted} model(s) sent"
                 )
 
-        if submitted == 0 and skipped == 0:
-            print("No usage found for any tool today.")
-
-        print(f"\n{'─' * 50}")
-        print(f"  Report Summary — {target}")
-        print(f"{'─' * 50}")
-        print(f"  Submitted : {submitted} model records")
-        print(f"  Skipped   : {skipped} already existed")
-        print(f"  Server    : {server}")
-        print(f"{'─' * 50}\n")
+        print(f"\n{'─'*50}")
+        print(f"  Summary — {target}")
+        print(f"{'─'*50}")
+        print(f"  Tools with data : {tool_count}")
+        print(f"  Records sent    : {submitted}")
+        print(f"  Already existed : {skipped}")
+        print(f"  Server          : {server}")
+        print(f"{'─'*50}\n")
 
     else:
         # ── All dates: Claude Code historical scan ───────────────────────
