@@ -1,0 +1,54 @@
+{
+  "name": "aiops-agent",
+  "version": "1.0.0",
+  "description": "Monitor AI coding tool session costs locally — no API required",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "aiops": "./dist/cli.js",
+    "claude-monitor": "./bin/claude-monitor.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc || node -e \"process.exit(require('fs').existsSync('dist/cli.js')?0:1)\"",
+    "start": "node dist/cli.js",
+    "setup": "node -e \"require('os').platform()==='win32'?require('child_process').execSync('setup.bat',{stdio:'inherit'}):require('child_process').execSync('bash setup.sh',{stdio:'inherit'})\"",
+    "postinstall": "node -e \"try{require('child_process').execSync('npm rebuild better-sqlite3',{stdio:'inherit'})}catch(e){console.log('better-sqlite3 rebuild skipped (optional)')}\""
+  },
+  "keywords": [
+    "claude",
+    "anthropic",
+    "monitor",
+    "cost",
+    "tokens",
+    "gemini",
+    "cursor",
+    "windsurf",
+    "cline"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "chokidar": "^3.6.0",
+    "cli-table3": "^0.6.3",
+    "commander": "^12.1.0",
+    "gpt-tokenizer": "^2.1.2",
+    "string-width": "^4.2.3"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.8.0",
+    "typescript": "^6.0.3"
+  }
+}
