@@ -16,14 +16,48 @@ import sys
 # Source: Anthropic pricing as of 2025-05 — update here when prices change,
 # then run seed.py again (it will add a new current row and expire the old one).
 PRICING_ROWS = [
-    # Claude Code / claude.ai uses claude-sonnet-4-5 by default
-    ("claude_code", "claude-sonnet-4-5",  300,  1500, 30,  375),
-    ("claude_code", "claude-opus-4-5",   1500,  7500, 150, 1875),
-    ("claude_code", "claude-haiku-4-5",    80,   400,  8,  100),
-    # Cursor (varies by plan — using pay-as-you-go rates)
-    ("cursor",      "claude-sonnet-4-5",  300,  1500, 30,  375),
-    ("cursor",      "gpt-4o",             250,  1000,  0,    0),
-    ("cursor",      "gpt-4o-mini",         15,    60,  0,    0),
+    # Claude Code — short aliases
+    ("claude_code", "claude-sonnet-4-5",             300,  1500,  30,  375),
+    ("claude_code", "claude-opus-4-5",               500,  2500,  50,  625),
+    ("claude_code", "claude-haiku-4-5",               80,   400,   8,  100),
+    # Claude Code — versioned IDs returned by the API
+    ("claude_code", "claude-haiku-4-5-20251001",      80,   400,   8,  100),
+    ("claude_code", "claude-sonnet-4-5-20251001",    300,  1500,  30,  375),
+    ("claude_code", "claude-opus-4-5-20251001",      500,  2500,  50,  625),
+    # Claude 3.7 / 3.5
+    ("claude_code", "claude-3-7-sonnet-20250219",    300,  1500,  30,  375),
+    ("claude_code", "claude-3-5-sonnet-20241022",    300,  1500,  30,  375),
+    ("claude_code", "claude-3-5-haiku-20241022",      80,   400,   8,  100),
+    # Cline — versioned IDs
+    ("cline",       "claude-haiku-4-5-20251001",      80,   400,   8,  100),
+    ("cline",       "claude-sonnet-4-5-20251001",    300,  1500,  30,  375),
+    ("cline",       "claude-3-5-sonnet-20241022",    300,  1500,  30,  375),
+    ("cline",       "claude-3-5-haiku-20241022",      80,   400,   8,  100),
+    # Roo
+    ("roo",         "claude-haiku-4-5-20251001",      80,   400,   8,  100),
+    ("roo",         "claude-sonnet-4-5-20251001",    300,  1500,  30,  375),
+    ("roo",         "claude-3-5-sonnet-20241022",    300,  1500,  30,  375),
+    ("roo",         "claude-3-5-haiku-20241022",      80,   400,   8,  100),
+    # Kilo
+    ("kilo",        "claude-haiku-4-5-20251001",      80,   400,   8,  100),
+    ("kilo",        "claude-sonnet-4-5-20251001",    300,  1500,  30,  375),
+    ("kilo",        "claude-3-5-sonnet-20241022",    300,  1500,  30,  375),
+    # Cursor
+    ("cursor",      "claude-sonnet-4-5",             300,  1500,  30,  375),
+    ("cursor",      "claude-haiku-4-5-20251001",      80,   400,   8,  100),
+    ("cursor",      "gpt-4o",                        250,  1000,   0,    0),
+    ("cursor",      "gpt-4o-mini",                    15,    60,   0,    0),
+    # Copilot
+    ("copilot",     "copilot/auto",                    0,     0,   0,    0),
+    # Gemini
+    ("gemini",      "gemini-2.5-pro",                125,  1000,   0,    0),
+    ("gemini",      "gemini-2.5-flash",               15,    60,   0,    0),
+    ("gemini",      "gemini-2.0-flash",                8,    30,   2,    9),
+    ("gemini",      "gemini-1.5-pro",                125,   500,   0,    0),
+    ("gemini",      "gemini-1.5-flash",                8,    30,   2,    9),
+    ("gemini",      "gemini-antigravity",               8,    30,   0,    0),
+    # Windsurf
+    ("windsurf",    "windsurf",                        0,     0,   0,    0),
 ]
 
 
