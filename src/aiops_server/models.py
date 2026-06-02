@@ -56,9 +56,9 @@ class DailyRollupRequest(BaseModel):
     device_id: int
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     tool: str
-    model: str
-    input_tokens: int = Field(ge=0)
-    output_tokens: int = Field(ge=0)
+    model: str = ""
+    input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
     cache_read_tokens: int = Field(default=0, ge=0)
     cache_write_tokens: int = Field(default=0, ge=0)
     sessions: int = Field(default=1, ge=0)
