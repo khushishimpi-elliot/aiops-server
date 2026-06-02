@@ -26,6 +26,8 @@ class Config(BaseSettings):
     smtp_user: str = ""
     smtp_password: Optional[SecretStr] = None
 
+    resend_api_key: str = ""
+
     sentry_dsn: str = ""
     slack_webhook_url: str = ""
 
@@ -34,7 +36,7 @@ class Config(BaseSettings):
 
     @property
     def email_configured(self) -> bool:
-        return bool(self.smtp_user and self.smtp_password)
+        return bool(self.resend_api_key)
 
 
 @lru_cache(maxsize=1)
