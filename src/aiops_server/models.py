@@ -164,6 +164,12 @@ class DevSummaryResponse(BaseModel):
     developers: list[DevSummaryItem]
 
 
+class TaskCategoryItem(BaseModel):
+    category: str
+    session_count: int
+    pct: int
+
+
 class DevDetailResponse(BaseModel):
     user_id: int
     email: str
@@ -179,12 +185,6 @@ class DevDetailResponse(BaseModel):
     team_name: str | None = None
     machine_label: str | None = None
     last_seen_at: datetime | None = None
-
-
-class TaskCategoryItem(BaseModel):
-    category: str
-    session_count: int
-    pct: int
 
 
 class CategoryRollupRequest(BaseModel):
