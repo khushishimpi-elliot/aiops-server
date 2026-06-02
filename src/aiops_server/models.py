@@ -48,6 +48,51 @@ class EnrollResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Agent enrollment — npm package flow (OTP → api_token returned)
+# ---------------------------------------------------------------------------
+
+class AgentEnrollRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
+    enrollment_token: str
+    machine_id: str = Field(min_length=1, max_length=256)  # plain hostname-platform, hashed server-side
+    hostname: str | None = None
+    os: str | None = None
+
+
+class AgentEnrollResponse(BaseModel):
+    api_token: str
+    device_id: int
+    user_id: int
+
+
+# ---------------------------------------------------------------------------
+# Agent sync — npm package telemetry submission
+# ---------------------------------------------------------------------------
+
+class AgentAggregateItem(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    tool: str
+    model: str
+    category: str | None = None
+    sessions: int = Field(ge=0)
+    total_turns: int = Field(ge=0)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    cache_tokens: int = Field(default=0, ge=0)
+    cost_usd: float = Field(ge=0.0)
+    active_day: int = Field(ge=0)
+
+
+class AgentSyncRequest(BaseModel):
+    enrollment_token: str
+    machine_id: str
+    hostname: str | None = None
+    os: str | None = None
+    sent_at: str | None = None
+    aggregates: list[AgentAggregateItem]
+
+
+# ---------------------------------------------------------------------------
 # Telemetry  (Step 5 — shapes defined here so imports don't break)
 # ---------------------------------------------------------------------------
 

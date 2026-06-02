@@ -13,7 +13,7 @@ from slowapi.util import get_remote_address
 from .config import get_config
 from .db import close_pool, init_pool
 from .errors import register_error_handlers
-from .routers import admin, enrollment, health, query, telemetry
+from .routers import admin, agent, enrollment, health, query, telemetry
 
 
 @asynccontextmanager
@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(telemetry.router)
     app.include_router(query.router)
+    app.include_router(agent.router)
 
     # Serve React SPA — fall back to index.html for unknown paths so React Router works
     dashboard_path = Path(__file__).parent / "dashboard"
