@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "Monitor AI coding tool session costs locally — no API required",
   "type": "module",
-  "main": "dist/cli.js",
+  "main": "dist/cli.cjs",
   "bin": {
-    "aiops": "./dist/cli.js",
+    "aiops": "./dist/cli.cjs",
     "claude-monitor": "./bin/claude-monitor.js"
   },
   "files": [
-    "dist",
+    "dist/cli.cjs",
     "bin",
     "src"
   ],
@@ -17,8 +17,8 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "tsc",
-    "prepare": "tsc || node -e \"process.exit(require('fs').existsSync('dist/cli.js')?0:1)\"",
+    "build": "npx esbuild src/cli.ts --bundle --platform=node --target=node18 --external:better-sqlite3 --format=cjs --define:import.meta.url=__filename --outfile=dist/cli.cjs",
+    "prepare": "npm run build || node -e \"process.exit(require('fs').existsSync('dist/cli.cjs')?0:1)\"",
     "start": "node dist/cli.js",
     "setup": "node -e \"require('os').platform()==='win32'?require('child_process').execSync('setup.bat',{stdio:'inherit'}):require('child_process').execSync('bash setup.sh',{stdio:'inherit'})\"",
     "postinstall": "node -e \"try{require('child_process').execSync('npm rebuild better-sqlite3',{stdio:'inherit'})}catch(e){console.log('better-sqlite3 rebuild skipped (optional)')}\""
@@ -49,6 +49,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.8.0",
+    "esbuild": "0.28.0",
     "typescript": "^6.0.3"
   }
 }

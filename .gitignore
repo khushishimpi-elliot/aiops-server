@@ -34,3 +34,7 @@ Thumbs.db
 
 # Dashboard source node_modules only — built output IS committed so Render can serve it
 dashboard/node_modules/
+
+# aiops-agent: commit the bundled dist so npm install -g works without node_modules
+!aiops-agent/dist/
+aiops-agent/node_modules/
