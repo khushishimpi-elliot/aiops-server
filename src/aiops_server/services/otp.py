@@ -6,7 +6,7 @@ import bcrypt
 
 OTP_DIGITS = 6
 OTP_EXPIRY_MINUTES = 10
-OTP_MAX_PER_HOUR = 3
+OTP_MAX_PER_HOUR = 10
 
 
 def _generate_code() -> str:

@@ -57,7 +57,7 @@ async def send_otp(
         raise AppError(403, "domain_not_allowed")
 
     if not await otp_svc.within_rate_limit(conn, email):
-        raise AppError(429, "otp_rate_limit_exceeded", "Max 3 OTPs per hour.")
+        raise AppError(429, "otp_rate_limit_exceeded", "Max 10 OTPs per hour.")
 
     import logging
 
