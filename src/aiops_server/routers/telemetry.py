@@ -2,7 +2,6 @@ import hashlib
 from datetime import date as date_type
 
 import asyncpg
-from asyncpg.exceptions import UniqueViolationError
 from fastapi import APIRouter, Depends
 
 from ..db import get_db
@@ -53,47 +52,47 @@ async def daily_rollup(
 
     parsed_date = date_type.fromisoformat(body.date)
 
-    try:
-        async with conn.transaction():
-            usage_id: int = await conn.fetchval(
-                """
-                INSERT INTO usage(
-                    user_id, device_id, date, tool, model,
-                    input_tokens, output_tokens,
-                    cache_read_tokens, cache_write_tokens,
-                    cost_millicents, idempotency_key
-                )
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-                RETURNING id
-                """,
-                device["user_id"], body.device_id, parsed_date,
-                body.tool, body.model,
-                body.input_tokens, body.output_tokens,
-                body.cache_read_tokens, body.cache_write_tokens,
-                cost_millicents, body.idempotency_key,
+    async with conn.transaction():
+        # Upsert: the agent re-sends the full day's totals on every report,
+        # so a repeat for the same (device, date, model) must OVERWRITE the
+        # earlier snapshot — otherwise the day's numbers freeze at whatever the
+        # first report of the day captured. A genuine network-retry resends
+        # identical values, so overwriting is harmless there too.
+        usage_id: int = await conn.fetchval(
+            """
+            INSERT INTO usage(
+                user_id, device_id, date, tool, model,
+                input_tokens, output_tokens,
+                cache_read_tokens, cache_write_tokens,
+                cost_millicents, idempotency_key
             )
-
-            # Keep device heartbeat and agent version current
-            await conn.execute(
-                """
-                UPDATE devices
-                SET last_seen_at  = now(),
-                    agent_version = COALESCE($2, agent_version)
-                WHERE id = $1
-                """,
-                body.device_id,
-                body.agent_version,
-            )
-
-    except UniqueViolationError:
-        # Idempotent retry — return the original row unchanged
-        row = await conn.fetchrow(
-            "SELECT id, cost_millicents FROM usage WHERE idempotency_key = $1",
-            body.idempotency_key,
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            ON CONFLICT (idempotency_key) DO UPDATE SET
+                input_tokens       = EXCLUDED.input_tokens,
+                output_tokens      = EXCLUDED.output_tokens,
+                cache_read_tokens  = EXCLUDED.cache_read_tokens,
+                cache_write_tokens = EXCLUDED.cache_write_tokens,
+                cost_millicents    = EXCLUDED.cost_millicents,
+                recorded_at        = now()
+            RETURNING id
+            """,
+            device["user_id"], body.device_id, parsed_date,
+            body.tool, body.model,
+            body.input_tokens, body.output_tokens,
+            body.cache_read_tokens, body.cache_write_tokens,
+            cost_millicents, body.idempotency_key,
         )
-        return DailyRollupResponse(
-            usage_id=row["id"],
-            cost_millicents=row["cost_millicents"],
+
+        # Keep device heartbeat and agent version current
+        await conn.execute(
+            """
+            UPDATE devices
+            SET last_seen_at  = now(),
+                agent_version = COALESCE($2, agent_version)
+            WHERE id = $1
+            """,
+            body.device_id,
+            body.agent_version,
         )
 
     return DailyRollupResponse(usage_id=usage_id, cost_millicents=cost_millicents)

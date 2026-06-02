@@ -110,7 +110,7 @@ class DevSummaryItem(BaseModel):
     total_cost_millicents: int
     total_input_tokens: int
     total_output_tokens: int
-    last_active: datetime | None
+    last_active: date | None   # most recent day of actual usage (usage.date), not upload time
     active_devices: int
 
 

@@ -45,7 +45,9 @@ async def list_developers(
             COALESCE(SUM(us.cost_millicents), 0)::bigint  AS total_cost_millicents,
             COALESCE(SUM(us.input_tokens),    0)::bigint  AS total_input_tokens,
             COALESCE(SUM(us.output_tokens),   0)::bigint  AS total_output_tokens,
-            (SELECT MAX(us2.recorded_at) FROM usage us2 WHERE us2.user_id = u.id) AS last_active,
+            -- Last active = most recent day the developer actually used the tool
+            -- (usage.date from the Claude logs), NOT when telemetry was uploaded.
+            (SELECT MAX(us2.date) FROM usage us2 WHERE us2.user_id = u.id) AS last_active,
             COUNT(DISTINCT d.id)
                 FILTER (WHERE d.status = 'active')::int  AS active_devices
         FROM   users u
