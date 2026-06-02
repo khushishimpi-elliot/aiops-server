@@ -468,17 +468,21 @@ export default function DeveloperList() {
   const [drawerEmail, setDrawerEmail] = useState<string | null>(null)
   const [drawerColorIdx, setDrawerColorIdx] = useState(0)
   const [lastUpdated, setLastUpdated] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
-  function fetchDevelopers() {
-    setDevelopers(null); setError('')
+  function fetchDevelopers(clear = false) {
+    if (clear) setDevelopers(null)
+    setError('')
+    setRefreshing(true)
     api.developers(days)
       .then(r => { setDevelopers(r.developers); setLastUpdated(new Date().toLocaleTimeString()) })
       .catch(e => setError(e.message))
+      .finally(() => setRefreshing(false))
   }
 
-  useEffect(() => { fetchDevelopers() }, [days])
+  useEffect(() => { fetchDevelopers(true) }, [days])
   useEffect(() => {
-    const id = setInterval(() => { fetchDevelopers() }, 5 * 60 * 1000)
+    const id = setInterval(() => { fetchDevelopers() }, 30 * 1000)
     return () => clearInterval(id)
   }, [])
 
@@ -502,13 +506,35 @@ export default function DeveloperList() {
             )}
           </div>
         </div>
-        <select className="period-select" value={days} onChange={e => setDays(Number(e.target.value))}>
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-          <option value={180}>Last 180 days</option>
-          <option value={365}>Last 1 year</option>
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => fetchDevelopers()}
+            disabled={refreshing}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8, border: '1px solid var(--gray-200)',
+              background: 'white', color: 'var(--gray-600)', fontSize: 13, fontWeight: 500,
+              cursor: refreshing ? 'not-allowed' : 'pointer', opacity: refreshing ? 0.6 : 1,
+            }}
+          >
+            <svg
+              width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }}
+            >
+              <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/>
+              <polyline points="21 3 21 8 16 8"/>
+            </svg>
+            Refresh
+          </button>
+          <select className="period-select" value={days} onChange={e => setDays(Number(e.target.value))}>
+            <option value={7}>Last 7 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+            <option value={180}>Last 180 days</option>
+            <option value={365}>Last 1 year</option>
+          </select>
+        </div>
       </div>
 
       <div className="content-area">

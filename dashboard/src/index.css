@@ -1313,3 +1313,8 @@ html, body {
   color: var(--gray-400);
   padding: 4px 0;
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
