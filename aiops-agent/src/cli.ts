@@ -1292,6 +1292,7 @@ program
 
     const serverUrl = opts.server.replace(/\/$/, '');
     const machineId = getMachineId();
+    const TIMEOUT_MS = 45_000; // Render free tier can take ~30s to cold-start
 
     console.log(chalk.bold('\n  Elliot AIOps — Device Enrollment\n'));
 
@@ -1308,7 +1309,7 @@ program
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (discoverRes.ok) {
         const { allowed } = await discoverRes.json() as { allowed: boolean };
@@ -1321,14 +1322,14 @@ program
       console.log(chalk.yellow('  Could not reach server to verify domain — continuing'));
     }
 
-    // Step 3: request OTP
-    console.log(chalk.dim('\n  Sending one-time code to ' + email + '...'));
+    // Step 3: request OTP (server may be cold-starting — wait up to 45s)
+    console.log(chalk.dim('\n  Sending one-time code to ' + email + ' (may take ~30s if server is waking up)...'));
     try {
       const otpRes = await fetch(serverUrl + '/enroll/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!otpRes.ok) {
         const err = await otpRes.json().catch(() => ({})) as Record<string, unknown>;
@@ -1337,6 +1338,7 @@ program
       }
     } catch (e) {
       console.error(chalk.red('  Server unreachable: ' + String(e)));
+      console.error(chalk.dim('  If this is the first request of the day, the server may need a minute to wake up. Try again.'));
       process.exit(1);
     }
 
@@ -1354,7 +1356,7 @@ program
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!verifyRes.ok) {
         const err = await verifyRes.json().catch(() => ({})) as Record<string, unknown>;
@@ -1380,7 +1382,7 @@ program
           hostname:         os.hostname(),
           os:               process.platform,
         }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!enrollRes.ok) {
         const err = await enrollRes.json().catch(() => ({})) as Record<string, unknown>;

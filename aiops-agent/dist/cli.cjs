@@ -16257,6 +16257,7 @@ program.command("enroll").description("Connect to company server via email OTP")
   }
   const serverUrl = opts.server.replace(/\/$/, "");
   const machineId = getMachineId();
+  const TIMEOUT_MS = 45e3;
   console.log(source_default.bold("\n  Elliot AIOps \u2014 Device Enrollment\n"));
   const email = opts.email || await prompt("  Work email: ");
   if (!email.includes("@")) {
@@ -16268,7 +16269,7 @@ program.command("enroll").description("Connect to company server via email OTP")
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
-      signal: AbortSignal.timeout(1e4)
+      signal: AbortSignal.timeout(TIMEOUT_MS)
     });
     if (discoverRes.ok) {
       const { allowed } = await discoverRes.json();
@@ -16280,13 +16281,13 @@ program.command("enroll").description("Connect to company server via email OTP")
   } catch {
     console.log(source_default.yellow("  Could not reach server to verify domain \u2014 continuing"));
   }
-  console.log(source_default.dim("\n  Sending one-time code to " + email + "..."));
+  console.log(source_default.dim("\n  Sending one-time code to " + email + " (may take ~30s if server is waking up)..."));
   try {
     const otpRes = await fetch(serverUrl + "/enroll/send-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
-      signal: AbortSignal.timeout(1e4)
+      signal: AbortSignal.timeout(TIMEOUT_MS)
     });
     if (!otpRes.ok) {
       const err = await otpRes.json().catch(() => ({}));
@@ -16295,6 +16296,7 @@ program.command("enroll").description("Connect to company server via email OTP")
     }
   } catch (e) {
     console.error(source_default.red("  Server unreachable: " + String(e)));
+    console.error(source_default.dim("  If this is the first request of the day, the server may need a minute to wake up. Try again."));
     process.exit(1);
   }
   const code = await prompt("  Enter 6-digit code from your email: ");
@@ -16308,7 +16310,7 @@ program.command("enroll").description("Connect to company server via email OTP")
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, code }),
-      signal: AbortSignal.timeout(1e4)
+      signal: AbortSignal.timeout(TIMEOUT_MS)
     });
     if (!verifyRes.ok) {
       const err = await verifyRes.json().catch(() => ({}));
@@ -16332,7 +16334,7 @@ program.command("enroll").description("Connect to company server via email OTP")
         hostname: import_os6.default.hostname(),
         os: process.platform
       }),
-      signal: AbortSignal.timeout(1e4)
+      signal: AbortSignal.timeout(TIMEOUT_MS)
     });
     if (!enrollRes.ok) {
       const err = await enrollRes.json().catch(() => ({}));
