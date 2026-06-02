@@ -8,20 +8,20 @@ const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#6b7280']
 
 const ALL_TOOLS = [
   'claude_code','copilot','cursor','gemini','windsurf','cline',
-  'roo_code','codex','pi','kilo_code',
+  'roo','kilo','codex','pi',
 ]
 
 const TOOL_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  claude_code: { bg: '#fff3ec', color: '#FF6600', label: 'claude' },
-  copilot:     { bg: '#f1f5f9', color: '#374151', label: 'copilot' },
-  cursor:      { bg: '#eef2ff', color: '#6366f1', label: 'cursor' },
-  gemini:      { bg: '#eff6ff', color: '#3b82f6', label: 'gemini' },
-  windsurf:    { bg: '#f0fdf4', color: '#16a34a', label: 'windsurf' },
-  cline:       { bg: '#f0fdfa', color: '#0d9488', label: 'cline' },
-  roo_code:    { bg: '#fdf4ff', color: '#9333ea', label: 'roo' },
-  codex:       { bg: '#f0fdf4', color: '#15803d', label: 'codex' },
-  pi:          { bg: '#f8fafc', color: '#475569', label: 'pi' },
-  kilo_code:   { bg: '#fff7ed', color: '#c2410c', label: 'kilo' },
+  claude_code: { bg: '#fff3ec', color: '#FF6600',  label: 'Claude Code' },
+  copilot:     { bg: '#f1f5f9', color: '#374151',  label: 'Copilot' },
+  cursor:      { bg: '#eef2ff', color: '#6366f1',  label: 'Cursor' },
+  gemini:      { bg: '#eff6ff', color: '#3b82f6',  label: 'Gemini' },
+  windsurf:    { bg: '#f0fdf4', color: '#16a34a',  label: 'Windsurf' },
+  cline:       { bg: '#f0fdfa', color: '#0d9488',  label: 'Cline' },
+  roo:         { bg: '#fdf4ff', color: '#9333ea',  label: 'Roo Code' },
+  kilo:        { bg: '#fff7ed', color: '#c2410c',  label: 'Kilo Code' },
+  codex:       { bg: '#f0fdf4', color: '#15803d',  label: 'Codex' },
+  pi:          { bg: '#f8fafc', color: '#475569',  label: 'Pi' },
 }
 
 function nameFromEmail(email: string): string {
@@ -242,9 +242,9 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               {/* Tools Detected */}
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Tools Detected</div>
-                {toolList.map(t => (
+                {toolList.filter(t => t.sessions > 0).map(t => (
                   <div className="drawer-bar-row" key={t.tool}>
-                    <span className="drawer-bar-label">{t.tool.replace('_', ' ')}</span>
+                    <span className="drawer-bar-label">{TOOL_BADGE[t.tool]?.label ?? t.tool}</span>
                     <div className="drawer-bar-track">
                       <div className="drawer-bar-fill" style={{ width: `${Math.round(t.sessions / maxToolSessions * 100)}%` }} />
                     </div>
@@ -461,7 +461,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
 }
 
 export default function DeveloperList() {
-  const [days, setDays] = useState(30)
+  const [days, setDays] = useState(90)
   const [developers, setDevelopers] = useState<DevSummaryItem[] | null>(null)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
@@ -506,6 +506,8 @@ export default function DeveloperList() {
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
           <option value={90}>Last 90 days</option>
+          <option value={180}>Last 180 days</option>
+          <option value={365}>Last 1 year</option>
         </select>
       </div>
 

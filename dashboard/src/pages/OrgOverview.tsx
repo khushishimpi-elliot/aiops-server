@@ -5,6 +5,24 @@ import { formatCost, formatTokens } from '../utils'
 
 const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ec4899']
 
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  claude_code: 'Claude Code',
+  claude:      'Claude Code',
+  copilot:     'GitHub Copilot',
+  gemini:      'Gemini CLI',
+  cursor:      'Cursor',
+  windsurf:    'Windsurf',
+  cline:       'Cline',
+  roo:         'Roo Code',
+  kilo:        'Kilo Code',
+  codex:       'Codex',
+  pi:          'Pi',
+}
+
+function displayToolName(tool: string): string {
+  return TOOL_DISPLAY_NAMES[tool.toLowerCase()] ?? tool
+}
+
 function nameFromEmail(email: string): string {
   const local = email.split('@')[0]
   return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
@@ -17,7 +35,7 @@ function avatarLetter(email: string): string {
 const DEV_COLORS = ['#FF6600','#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899']
 
 export default function OrgOverview() {
-  const [days, setDays] = useState(30)
+  const [days, setDays] = useState(90)
   const [data, setData] = useState<OrgOverviewResponse | null>(null)
   const [devs, setDevs] = useState<DevSummaryItem[] | null>(null)
   const [error, setError] = useState('')
@@ -115,6 +133,8 @@ export default function OrgOverview() {
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
           <option value={90}>Last 90 days</option>
+          <option value={180}>Last 180 days</option>
+          <option value={365}>Last 1 year</option>
         </select>
       </div>
 
@@ -266,12 +286,12 @@ export default function OrgOverview() {
                 </div>
                 <div className="panel-body">
                   {toolTotals.length === 0 ? (
-                    <p className="no-data">No tool data</p>
+                    <p className="no-data">No data yet — run <code>python aiops.py report</code></p>
                   ) : (
                     <div className="bar-chart">
                       {toolTotals.map((t, i) => (
                         <div className="bar-row" key={t.tool}>
-                          <div className="bar-label">{t.tool}</div>
+                          <div className="bar-label">{displayToolName(t.tool)}</div>
                           <div className="bar-track">
                             <div
                               className={'bar-fill' + (i > 0 ? ' gray' : '')}
