@@ -1,5 +1,6 @@
+import asyncio
 import asyncpg
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from ..config import Config, get_config
@@ -46,9 +47,12 @@ async def discover(
 async def send_otp(
     request: Request,
     body: SendOtpRequest,
+    background_tasks: BackgroundTasks,
     conn: asyncpg.Connection = Depends(get_db),
     config: Config = Depends(get_config),
 ) -> SendOtpResponse:
+    import logging
+
     email = str(body.email)
     domain = email.split("@")[1].lower()
 
@@ -59,16 +63,17 @@ async def send_otp(
     if not await otp_svc.within_rate_limit(conn, email):
         raise AppError(429, "otp_rate_limit_exceeded", "Max 10 OTPs per hour.")
 
-    import logging
-
     ip = request.client.host if request.client else None
     code, _ = await otp_svc.create_otp(conn, email, ip)
 
-    email_sent = await send_otp_email(config, email, code)
+    # Send email in the background so the response returns immediately.
+    # SMTP can take several seconds; blocking here caused client timeouts.
+    async def _send() -> None:
+        sent = await send_otp_email(config, email, code)
+        if not sent:
+            logging.warning(f"OTP email failed for {email} — code: {code}")
 
-    if not email_sent:
-        logging.warning(f"OTP for {email}: {code}")
-        logging.warning("EMAIL DELIVERY FAILED — check SMTP_USER and SMTP_PASSWORD in Render env vars")
+    background_tasks.add_task(_send)
 
     return SendOtpResponse(expires_in_seconds=600)
 

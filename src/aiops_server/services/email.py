@@ -25,7 +25,7 @@ def _send_sync(config: Config, to: str, code: str) -> None:
         "plain",
     ))
 
-    with smtplib.SMTP(config.smtp_host, config.smtp_port) as server:
+    with smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=20) as server:
         server.starttls()
         server.login(config.smtp_user, config.smtp_password.get_secret_value())
         server.sendmail(config.smtp_user, to, msg.as_string())
