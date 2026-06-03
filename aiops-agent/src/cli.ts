@@ -1277,7 +1277,7 @@ program.command('serve')
 
 program
   .command('enroll')
-  .description('Connect to company server with your work email and password')
+  .description('Connect to company server with your work email')
   .requiredOption('--server <url>', 'Company server URL')
   .option('--email <email>', 'Work email address (prompted if omitted)')
   .action(async (opts: { server: string; email?: string }) => {
@@ -1287,41 +1287,6 @@ program
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       return new Promise(resolve => {
         rl.question(question, answer => { rl.close(); resolve(answer.trim()); });
-      });
-    }
-
-    function promptPassword(question: string): Promise<string> {
-      return new Promise(resolve => {
-        const stdin = process.stdin as NodeJS.ReadStream & { setRawMode?: (mode: boolean) => void };
-        if (!process.stdout.isTTY || typeof stdin.setRawMode !== 'function') {
-          // Non-TTY fallback: read normally (no masking)
-          const rl = createInterface({ input: process.stdin, output: process.stdout });
-          rl.question(question, answer => { rl.close(); resolve(answer); });
-          return;
-        }
-        process.stdout.write(question);
-        let pw = '';
-        stdin.setRawMode(true);
-        stdin.setEncoding('utf8');
-        stdin.resume();
-        const onData = (char: string) => {
-          if (char === '\r' || char === '\n') {
-            stdin.setRawMode!(false);
-            stdin.pause();
-            stdin.removeListener('data', onData);
-            process.stdout.write('\n');
-            resolve(pw);
-          } else if (char === '') { // Ctrl+C
-            stdin.setRawMode!(false);
-            process.stdout.write('\n');
-            process.exit(1);
-          } else if (char === '' || char === '\b') { // Backspace
-            if (pw.length > 0) pw = pw.slice(0, -1);
-          } else if (char >= ' ') {
-            pw += char;
-          }
-        };
-        stdin.on('data', onData);
       });
     }
 
@@ -1350,82 +1315,32 @@ program
       process.exit(1);
     }
 
-    // Step 2: check domain allowed + wake server
+    // Step 2: authenticate with email -> enrollment_token
+    let enrollmentToken = '';
     try {
-      const discoverRes = await fetchWithRetry(serverUrl + '/enroll/discover', {
+      const authRes = await fetchWithRetry(serverUrl + '/enroll/email-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      if (discoverRes.ok) {
-        const { allowed } = await discoverRes.json() as { allowed: boolean };
-        if (!allowed) {
-          console.error(chalk.red('  Your email domain is not registered. Contact your admin.'));
-          process.exit(1);
-        }
-      }
-    } catch {
-      console.log(chalk.yellow('  Could not reach server — continuing'));
-    }
-
-    // Step 3: check if this is a new user or returning user
-    let isNewUser = true;
-    try {
-      const statusRes = await fetchWithRetry(
-        serverUrl + '/enroll/user-status?email=' + encodeURIComponent(email),
-        { method: 'GET' },
-      );
-      if (statusRes.ok) {
-        const { registered } = await statusRes.json() as { registered: boolean };
-        isNewUser = !registered;
-      }
-    } catch { /* server unreachable — assume new */ }
-
-    // Step 4: prompt for password (confirm only on first registration)
-    let password: string;
-    if (isNewUser) {
-      console.log(chalk.dim('\n  First time? Set a password for your account.'));
-      password = await promptPassword('  Choose a password (min 8 chars): ');
-      if (password.length < 8) {
-        console.error(chalk.red('  Password must be at least 8 characters'));
-        process.exit(1);
-      }
-      const confirm = await promptPassword('  Confirm password: ');
-      if (password !== confirm) {
-        console.error(chalk.red('  Passwords do not match'));
-        process.exit(1);
-      }
-    } else {
-      console.log(chalk.dim('\n  Welcome back! Enter your password to continue.'));
-      password = await promptPassword('  Password: ');
-    }
-
-    // Step 5: authenticate → enrollment_token
-    let enrollmentToken = '';
-    try {
-      const authRes = await fetchWithRetry(serverUrl + '/enroll/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
       if (!authRes.ok) {
         const err = await authRes.json().catch(() => ({})) as Record<string, unknown>;
         const msg = String(err['error'] ?? authRes.status);
-        if (msg === 'invalid_credentials') {
-          console.error(chalk.red('  Incorrect password. Try again or contact your admin.'));
+        if (msg === 'domain_not_allowed') {
+          console.error(chalk.red('  Your email domain is not registered. Contact your admin.'));
         } else {
-          console.error(chalk.red('  Authentication failed: ' + msg));
+          console.error(chalk.red('  Enrollment failed: ' + msg));
         }
         process.exit(1);
       }
       const body = await authRes.json() as { enrollment_token: string };
       enrollmentToken = body.enrollment_token;
     } catch (e) {
-      console.error(chalk.red('  Server error during authentication: ' + String(e)));
+      console.error(chalk.red('  Server unreachable after 3 attempts: ' + String(e)));
       process.exit(1);
     }
 
-    // Step 6: enroll device → api_token
+    // Step 3: register device -> api_token
     let apiToken = '';
     try {
       const enrollRes = await fetchWithRetry(serverUrl + '/api/enroll', {
@@ -1440,7 +1355,7 @@ program
       });
       if (!enrollRes.ok) {
         const err = await enrollRes.json().catch(() => ({})) as Record<string, unknown>;
-        console.error(chalk.red('  Enrollment failed: ' + String(err['error'] ?? enrollRes.status)));
+        console.error(chalk.red('  Device registration failed: ' + String(err['error'] ?? enrollRes.status)));
         process.exit(1);
       }
       const body = await enrollRes.json() as { api_token: string };
@@ -1465,7 +1380,6 @@ program
     console.log(chalk.dim('  Run aiops sync to send your data'));
     console.log();
   });
-
 program
   .command('sync')
   .description('Send data to company server')

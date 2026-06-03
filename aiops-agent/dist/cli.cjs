@@ -16244,7 +16244,7 @@ program.command("serve").description("Start local API server").option("-p, --por
   }
   startServer(port);
 });
-program.command("enroll").description("Connect to company server with your work email and password").requiredOption("--server <url>", "Company server URL").option("--email <email>", "Work email address (prompted if omitted)").action(async (opts) => {
+program.command("enroll").description("Connect to company server with your work email").requiredOption("--server <url>", "Company server URL").option("--email <email>", "Work email address (prompted if omitted)").action(async (opts) => {
   const { createInterface } = await import("readline");
   function prompt(question) {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -16253,42 +16253,6 @@ program.command("enroll").description("Connect to company server with your work 
         rl.close();
         resolve(answer.trim());
       });
-    });
-  }
-  function promptPassword(question) {
-    return new Promise((resolve) => {
-      const stdin = process.stdin;
-      if (!process.stdout.isTTY || typeof stdin.setRawMode !== "function") {
-        const rl = createInterface({ input: process.stdin, output: process.stdout });
-        rl.question(question, (answer) => {
-          rl.close();
-          resolve(answer);
-        });
-        return;
-      }
-      process.stdout.write(question);
-      let pw = "";
-      stdin.setRawMode(true);
-      stdin.setEncoding("utf8");
-      stdin.resume();
-      const onData = (char) => {
-        if (char === "\r" || char === "\n") {
-          stdin.setRawMode(false);
-          stdin.pause();
-          stdin.removeListener("data", onData);
-          process.stdout.write("\n");
-          resolve(pw);
-        } else if (char === "") {
-          stdin.setRawMode(false);
-          process.stdout.write("\n");
-          process.exit(1);
-        } else if (char === "\x7F" || char === "\b") {
-          if (pw.length > 0) pw = pw.slice(0, -1);
-        } else if (char >= " ") {
-          pw += char;
-        }
-      };
-      stdin.on("data", onData);
     });
   }
   const serverUrl = opts.server.replace(/\/$/, "");
@@ -16311,72 +16275,27 @@ program.command("enroll").description("Connect to company server with your work 
     console.error(source_default.red("  Invalid email address"));
     process.exit(1);
   }
+  let enrollmentToken = "";
   try {
-    const discoverRes = await fetchWithRetry(serverUrl + "/enroll/discover", {
+    const authRes = await fetchWithRetry(serverUrl + "/enroll/email-auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email })
     });
-    if (discoverRes.ok) {
-      const { allowed } = await discoverRes.json();
-      if (!allowed) {
-        console.error(source_default.red("  Your email domain is not registered. Contact your admin."));
-        process.exit(1);
-      }
-    }
-  } catch {
-    console.log(source_default.yellow("  Could not reach server \u2014 continuing"));
-  }
-  let isNewUser = true;
-  try {
-    const statusRes = await fetchWithRetry(
-      serverUrl + "/enroll/user-status?email=" + encodeURIComponent(email),
-      { method: "GET" }
-    );
-    if (statusRes.ok) {
-      const { registered } = await statusRes.json();
-      isNewUser = !registered;
-    }
-  } catch {
-  }
-  let password;
-  if (isNewUser) {
-    console.log(source_default.dim("\n  First time? Set a password for your account."));
-    password = await promptPassword("  Choose a password (min 8 chars): ");
-    if (password.length < 8) {
-      console.error(source_default.red("  Password must be at least 8 characters"));
-      process.exit(1);
-    }
-    const confirm = await promptPassword("  Confirm password: ");
-    if (password !== confirm) {
-      console.error(source_default.red("  Passwords do not match"));
-      process.exit(1);
-    }
-  } else {
-    console.log(source_default.dim("\n  Welcome back! Enter your password to continue."));
-    password = await promptPassword("  Password: ");
-  }
-  let enrollmentToken = "";
-  try {
-    const authRes = await fetchWithRetry(serverUrl + "/enroll/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
     if (!authRes.ok) {
       const err = await authRes.json().catch(() => ({}));
       const msg = String(err["error"] ?? authRes.status);
-      if (msg === "invalid_credentials") {
-        console.error(source_default.red("  Incorrect password. Try again or contact your admin."));
+      if (msg === "domain_not_allowed") {
+        console.error(source_default.red("  Your email domain is not registered. Contact your admin."));
       } else {
-        console.error(source_default.red("  Authentication failed: " + msg));
+        console.error(source_default.red("  Enrollment failed: " + msg));
       }
       process.exit(1);
     }
     const body = await authRes.json();
     enrollmentToken = body.enrollment_token;
   } catch (e) {
-    console.error(source_default.red("  Server error during authentication: " + String(e)));
+    console.error(source_default.red("  Server unreachable after 3 attempts: " + String(e)));
     process.exit(1);
   }
   let apiToken = "";
@@ -16393,7 +16312,7 @@ program.command("enroll").description("Connect to company server with your work 
     });
     if (!enrollRes.ok) {
       const err = await enrollRes.json().catch(() => ({}));
-      console.error(source_default.red("  Enrollment failed: " + String(err["error"] ?? enrollRes.status)));
+      console.error(source_default.red("  Device registration failed: " + String(err["error"] ?? enrollRes.status)));
       process.exit(1);
     }
     const body = await enrollRes.json();
