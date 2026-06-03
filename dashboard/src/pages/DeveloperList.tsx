@@ -164,7 +164,6 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const monthPct = Math.min(Math.round(monthCost / MONTHLY_BUDGET_MC * 100), 999)
 
   const readiness = data ? calcReadiness(data, days) : null
-  const maxDailyCost  = data ? Math.max(...data.daily.map(d => d.cost_millicents), 1) : 1
   const activeDayRows = data ? data.daily.filter(d => d.cost_millicents > 0) : []
 
   const lastSync = data?.last_seen_at
@@ -349,21 +348,35 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                 </div>
               </div>
 
-              {/* Daily Cost Trend */}
+              {/* Daily Cost Trend — vertical bar chart */}
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Daily Cost Trend</div>
-                {activeDayRows.length === 0 ? <p className="no-data">No data</p> : (
-                  [...data.daily].sort((a, b) => b.date.localeCompare(a.date))
-                    .filter(d => d.cost_millicents > 0).slice(0, 10).map(d => (
-                      <div className="drawer-bar-row" key={d.date}>
-                        <span className="drawer-bar-label">{d.date.slice(5)}</span>
-                        <div className="drawer-bar-track">
-                          <div className="drawer-bar-fill" style={{ width: `${Math.round(d.cost_millicents / maxDailyCost * 100)}%` }} />
-                        </div>
-                        <span className="drawer-bar-val">{formatCost(d.cost_millicents)}</span>
-                      </div>
-                    ))
-                )}
+                {activeDayRows.length === 0 ? <p className="no-data">No data</p> : (() => {
+                  const bars = [...data.daily]
+                    .filter(d => d.cost_millicents > 0)
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .slice(-10);
+                  const maxCost = Math.max(...bars.map(d => d.cost_millicents), 1);
+                  const CHART_H = 120;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: CHART_H + 36, padding: '0 4px' }}>
+                      {bars.map(d => {
+                        const barH = Math.max(4, Math.round((d.cost_millicents / maxCost) * CHART_H));
+                        return (
+                          <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%', justifyContent: 'flex-end' }}>
+                            <span style={{ fontSize: 9, color: 'var(--gray-400)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                              {formatCost(d.cost_millicents)}
+                            </span>
+                            <div style={{ width: '100%', height: barH, background: 'var(--brand)', borderRadius: '3px 3px 0 0' }} />
+                            <span style={{ fontSize: 9, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>
+                              {d.date.slice(5)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Models Used */}
