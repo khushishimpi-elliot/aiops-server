@@ -34,6 +34,46 @@ function avatarLetter(email: string): string {
 
 const DEV_COLORS = ['#FF6600','#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899']
 
+function normalizeCategories(
+  cats: TaskCategoryItem[]
+): TaskCategoryItem[] {
+  const MAIN = [
+    'code_generation',
+    'testing',
+    'configuration',
+    'debugging',
+  ]
+
+  const normalized: Record<string, number> = {
+    code_generation: 0,
+    testing:         0,
+    configuration:   0,
+    debugging:       0,
+    other:           0,
+  }
+
+  for (const c of cats) {
+    const key = c.category.toLowerCase().trim()
+    if (MAIN.includes(key)) {
+      normalized[key] += c.session_count
+    } else {
+      normalized['other'] += c.session_count
+    }
+  }
+
+  const total = Object.values(normalized)
+    .reduce((a, b) => a + b, 0) || 1
+
+  return Object.entries(normalized)
+    .filter(([, count]) => count > 0)
+    .map(([category, session_count]) => ({
+      category,
+      session_count,
+      pct: Math.round((session_count / total) * 100),
+    }))
+    .sort((a, b) => b.session_count - a.session_count)
+}
+
 export default function OrgOverview() {
   const [days, setDays] = useState(90)
   const [data, setData] = useState<OrgOverviewResponse | null>(null)
@@ -274,7 +314,7 @@ export default function OrgOverview() {
                           </tr>
                         </thead>
                         <tbody>
-                          {sortedDevs.slice(0, 5).map((dev, i) => (
+                          {sortedDevs.slice(0, 3).map((dev, i) => (
                             <tr key={dev.user_id}>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -358,7 +398,7 @@ export default function OrgOverview() {
                         </tr>
                       </thead>
                       <tbody>
-                        {modelRows.map(row => (
+                        {modelRows.slice(0, 5).map(row => (
                           <tr key={row.model}>
                             <td><span className="model-pill">{row.model}</span></td>
                             <td style={{ color: 'var(--gray-500)' }}>{row.sessions}</td>
@@ -393,7 +433,7 @@ export default function OrgOverview() {
                     <p className="no-data">No category data yet — run <code>python aiops.py report</code></p>
                   ) : (
                     <div className="cat-list">
-                      {data.task_categories.map((c: TaskCategoryItem, i: number) => (
+                      {normalizeCategories(data.task_categories).map((c: TaskCategoryItem, i: number) => (
                         <div className="cat-row" key={c.category}>
                           <div className="cat-meta">
                             <div className="cat-label-wrap">

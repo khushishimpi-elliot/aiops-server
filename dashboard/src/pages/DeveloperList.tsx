@@ -33,47 +33,53 @@ function avatarLetter(email: string): string {
   return email.charAt(0).toUpperCase()
 }
 
+function displayToolName(tool: string): string {
+  return TOOL_BADGE[tool.toLowerCase()]?.label ?? tool
+}
+
+function normalizeCategories(
+  cats: { category: string; session_count: number; pct: number }[]
+): { category: string; session_count: number; pct: number }[] {
+  const MAIN = [
+    'code_generation',
+    'testing',
+    'configuration',
+    'debugging',
+  ]
+
+  const normalized: Record<string, number> = {
+    code_generation: 0,
+    testing:         0,
+    configuration:   0,
+    debugging:       0,
+    other:           0,
+  }
+
+  for (const c of cats) {
+    const key = c.category.toLowerCase().trim()
+    if (MAIN.includes(key)) {
+      normalized[key] += c.session_count
+    } else {
+      normalized['other'] += c.session_count
+    }
+  }
+
+  const total = Object.values(normalized)
+    .reduce((a, b) => a + b, 0) || 1
+
+  return Object.entries(normalized)
+    .filter(([, count]) => count > 0)
+    .map(([category, session_count]) => ({
+      category,
+      session_count,
+      pct: Math.round((session_count / total) * 100),
+    }))
+    .sort((a, b) => b.session_count - a.session_count)
+}
+
 function isActive(lastActive: string | null): boolean {
   if (!lastActive) return false
   return Date.now() - new Date(lastActive).getTime() < 7 * 24 * 60 * 60 * 1000
-}
-
-function ToolBadge({ tool }: { tool: string }) {
-  const b = TOOL_BADGE[tool] ?? { bg: '#f1f5f9', color: '#374151', label: tool }
-  return (
-    <span style={{
-      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
-      background: b.bg, color: b.color, whiteSpace: 'nowrap',
-    }}>
-      {b.label}
-    </span>
-  )
-}
-
-function calcReadiness(data: DevDetailResponse, days: number) {
-  const activeDays = data.daily.filter(d => d.cost_millicents > 0).length
-  const tools = new Set(data.by_tool_model.map(r => r.tool)).size
-  const totalSessions = data.by_tool_model.reduce((s, r) => s + (r.session_count ?? r.days_active), 0)
-  const totalTokens = data.total_input_tokens + data.total_output_tokens
-  const avgTurns = totalSessions > 0 ? Math.round(totalTokens / 1000 / totalSessions) : 0
-
-  const engagement  = Math.min(Math.round(activeDays / Math.max(days, 1) * 25), 25)
-  const depth       = Math.min(Math.round(Math.min(avgTurns / 100, 1) * 25), 25)
-  const coverage    = Math.min(tools * 5, 20)
-  const progression = Math.min(Math.round(Math.min(data.total_cost_millicents / 1_000_000, 1) * 15), 15)
-  const friction    = Math.min(Math.round(activeDays / Math.max(days, 1) * 15), 15)
-  const score       = Math.min(engagement + depth + coverage + progression + friction, 100)
-
-  return {
-    score,
-    subs: [
-      { label: 'Engagement',  val: engagement,  max: 25, detail: `${activeDays} active days` },
-      { label: 'Depth',       val: depth,       max: 25, detail: `avg ${avgTurns}K tokens/session` },
-      { label: 'Coverage',    val: coverage,    max: 20, detail: `${tools} tools detected` },
-      { label: 'Progression', val: progression, max: 15, detail: data.total_cost_millicents > 1_000_000 ? 'power user' : 'growing' },
-      { label: 'Friction',    val: friction,    max: 15, detail: `${Math.round(activeDays / Math.max(days, 1) * 100)}% utilization` },
-    ],
-  }
 }
 
 const WEEKLY_BUDGET_MC  = 15_000 * 100
@@ -84,9 +90,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
 }) {
   const [data, setData] = useState<DevDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [breakdownExpanded, setBreakdownExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null)
+    setLoading(true); setData(null); setBreakdownExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -163,7 +170,6 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const weekPct  = Math.min(Math.round(weekCost  / WEEKLY_BUDGET_MC  * 100), 999)
   const monthPct = Math.min(Math.round(monthCost / MONTHLY_BUDGET_MC * 100), 999)
 
-  const readiness = data ? calcReadiness(data, days) : null
   const activeDayRows = data ? data.daily.filter(d => d.cost_millicents > 0) : []
 
   const lastSync = data?.last_seen_at
@@ -258,7 +264,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               {data.task_categories.length > 0 && (
                 <div className="drawer-section">
                   <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
-                  {data.task_categories.map((c, i) => (
+                  {normalizeCategories(data.task_categories || []).map((c, i) => (
                     <div key={c.category} style={{ marginBottom: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -277,26 +283,99 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
 
               {/* Daily Breakdown */}
               <div className="drawer-section">
-                <div className="drawer-section-title"><span className="dsicon">◆</span> Daily Breakdown</div>
-                {data.daily_by_tool.length === 0 ? (
+                <div className="drawer-section-title">
+                  <span className="dsicon">◆</span> Daily Breakdown
+                </div>
+                {data.by_tool_model.length === 0 ? (
                   <p className="no-data">No data</p>
                 ) : (
-                  <table className="drawer-table">
-                    <thead>
-                      <tr><th>Date</th><th>Tool</th><th>Model</th><th>Sessions</th><th>Tokens</th></tr>
-                    </thead>
-                    <tbody>
-                      {data.daily_by_tool.slice(0, 15).map((r, i) => (
-                        <tr key={i}>
-                          <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
-                          <td><ToolBadge tool={r.tool} /></td>
-                          <td><span className="model-pill">{r.model.replace('claude-','').replace('-20251001','')}</span></td>
-                          <td>{r.session_count}</td>
-                          <td>{formatTokens(r.input_tokens + r.output_tokens)}</td>
+                  <>
+                    <table className="drawer-table">
+                      <thead>
+                        <tr>
+                          <th>Tool</th>
+                          <th>Model</th>
+                          <th>Sessions</th>
+                          <th>Cost</th>
+                          <th>Tokens</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {(breakdownExpanded
+                          ? [...data.by_tool_model]
+                              .sort((a, b) =>
+                                b.cost_millicents - a.cost_millicents
+                              )
+                          : [...data.by_tool_model]
+                              .sort((a, b) =>
+                                b.cost_millicents - a.cost_millicents
+                              )
+                              .slice(0, 5)
+                        ).map((row, i) => (
+                          <tr key={i}>
+                            <td>
+                              <span className={
+                                row.tool === 'claude_code' ||
+                                row.tool === 'claude'
+                                  ? 'dtag orange'
+                                  : 'dtag'
+                              }>
+                                {displayToolName(row.tool)}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="dtag">{row.model}</span>
+                            </td>
+                            <td>{row.session_count ?? row.days_active}</td>
+                            <td className="cost-cell">
+                              {formatCost(row.cost_millicents)}
+                            </td>
+                            <td>
+                              {formatTokens(
+                                row.input_tokens + row.output_tokens
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {data.by_tool_model.length > 5 && (
+                      <button
+                        onClick={() =>
+                          setBreakdownExpanded(!breakdownExpanded)
+                        }
+                        style={{
+                          width:           '100%',
+                          marginTop:       '8px',
+                          padding:         '8px',
+                          background:      'transparent',
+                          border:          '1px solid var(--gray-200)',
+                          borderRadius:    '6px',
+                          fontSize:        '12px',
+                          color:           'var(--gray-500)',
+                          cursor:          'pointer',
+                          transition:      'all 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                          (e.target as HTMLButtonElement).style.background =
+                            'var(--gray-50)'
+                          ;(e.target as HTMLButtonElement).style.color =
+                            'var(--brand)'
+                        }}
+                        onMouseLeave={e => {
+                          (e.target as HTMLButtonElement).style.background =
+                            'transparent'
+                          ;(e.target as HTMLButtonElement).style.color =
+                            'var(--gray-500)'
+                        }}
+                      >
+                        {breakdownExpanded
+                          ? '▲ Show less'
+                          : `▼ View all ${data.by_tool_model.length} entries`}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -396,41 +475,6 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                   ))
                 )}
               </div>
-
-              {/* Readiness Score */}
-              {readiness && (
-                <div className="drawer-section">
-                  <div className="drawer-section-title"><span className="dsicon">◆</span> Readiness Score</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-                    <div style={{
-                      fontSize: 48, fontWeight: 800, lineHeight: 1,
-                      color: readiness.score >= 70 ? 'var(--brand)' : readiness.score >= 40 ? '#f59e0b' : '#ef4444',
-                    }}>
-                      {readiness.score}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, color: 'var(--gray-500)', marginBottom: 6 }}>/ 100</div>
-                      <div style={{ height: 8, background: 'var(--gray-100)', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', width: `${readiness.score}%`, borderRadius: 4, transition: 'width 0.6s ease',
-                          background: readiness.score >= 70 ? 'var(--brand)' : readiness.score >= 40 ? '#f59e0b' : '#ef4444',
-                        }} />
-                      </div>
-                    </div>
-                  </div>
-                  {readiness.subs.map(s => (
-                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                      <span style={{ width: 90, fontSize: 12, color: 'var(--gray-600)', flexShrink: 0 }}>{s.label}</span>
-                      <div style={{ flex: 1, height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
-                        <div style={{ height: '100%', width: `${Math.round(s.val / s.max * 100)}%`, background: 'var(--brand)', borderRadius: 2 }} />
-                      </div>
-                      <span style={{ fontSize: 11, color: 'var(--gray-500)', minWidth: 80, textAlign: 'right' }}>
-                        {s.val}/{s.max} · {s.detail}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {/* Budget */}
               <div className="drawer-section">
