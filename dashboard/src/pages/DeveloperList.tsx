@@ -359,15 +359,15 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                   const maxCost = Math.max(...bars.map(d => d.cost_millicents), 1);
                   const CHART_H = 120;
                   return (
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: CHART_H + 36, padding: '0 0' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${bars.length}, 1fr)`, gap: 4, height: CHART_H + 36, alignItems: 'end' }}>
                       {bars.map(d => {
                         const barH = Math.max(4, Math.round((d.cost_millicents / maxCost) * CHART_H));
                         return (
-                          <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%', justifyContent: 'flex-end' }}>
+                          <div key={d.date} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%', justifyContent: 'flex-end' }}>
                             <span style={{ fontSize: 8, color: 'var(--gray-400)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                               {formatCost(d.cost_millicents)}
                             </span>
-                            <div style={{ width: '50%', maxWidth: 20, minWidth: 8, height: barH, background: 'var(--brand)', borderRadius: '3px 3px 0 0' }} />
+                            <div style={{ width: 14, height: barH, background: 'var(--brand)', borderRadius: '3px 3px 0 0' }} />
                             <span style={{ fontSize: 8, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>
                               {d.date.slice(5)}
                             </span>
