@@ -1,137 +1,156 @@
 {
-  "report_generated": "2026-05-21T09:21:33.105Z",
+  "report_generated": "2026-06-03T11:05:31.193Z",
   "period": "last_28_days",
   "tools_detected": [
     "Claude Code",
     "GitHub Copilot",
-    "Codex"
+    "Gemini CLI",
+    "Cursor",
+    "Cline",
+    "Roo Code",
+    "Codex",
+    "Pi"
   ],
   "engagement": {
-    "total_sessions": 14,
+    "total_sessions": 72,
     "sessions_per_week": {
-      "W1": 3,
-      "W2": 0,
-      "W3": 1,
-      "W4": 9
+      "W1": 6,
+      "W2": 36,
+      "W3": 6,
+      "W4": 22
     },
-    "active_days": 7,
-    "active_days_per_week": 1.8,
-    "total_user_prompts": 747
+    "active_days": 16,
+    "active_days_per_week": 4,
+    "total_user_prompts": 3275
   },
   "depth": {
-    "avg_turns_per_session": 132.1,
-    "multi_turn_rate": 100,
-    "deep_session_rate": 100,
-    "longest_session_turns": 356
+    "avg_turns_per_session": 116.1,
+    "multi_turn_rate": 79,
+    "deep_session_rate": 79,
+    "longest_session_turns": 554
   },
   "task_coverage": {
     "task_category_breakdown": {
       "other": {
-        "count": 5,
-        "pct": 36
-      },
-      "analysis": {
-        "count": 3,
-        "pct": 21
+        "count": 43,
+        "pct": 60
       },
       "code_generation": {
-        "count": 3,
-        "pct": 21
+        "count": 12,
+        "pct": 17
+      },
+      "analysis": {
+        "count": 9,
+        "pct": 13
       },
       "configuration": {
+        "count": 5,
+        "pct": 7
+      },
+      "debugging": {
         "count": 2,
-        "pct": 14
+        "pct": 3
       },
       "research": {
         "count": 1,
-        "pct": 7
+        "pct": 1
       }
     },
     "primary_use_case": "other",
-    "task_diversity_score": 63
+    "task_diversity_score": 75
   },
   "progression": {
-    "week_over_week_trend": 200,
+    "week_over_week_trend": 267,
     "tools_used": {
-      "Claude Code": 13,
-      "GitHub Copilot": 14,
-      "Codex": 1
+      "Claude Code": 57,
+      "GitHub Copilot": 5,
+      "Gemini CLI": 4,
+      "Cursor": 1,
+      "Cline": 2,
+      "Roo Code": 1,
+      "Codex": 1,
+      "Pi": 1
     },
-    "tool_diversity_count": 3
+    "tool_diversity_count": 8
   },
   "friction": {
-    "abandoned_session_rate": 0,
-    "zero_session_days": 21,
-    "longest_gap_days": 17
+    "abandoned_session_rate": 21,
+    "zero_session_days": 12,
+    "longest_gap_days": 3
   },
   "tokens": {
-    "input": 36427,
-    "output": 1150817,
-    "cache_read": 77961004,
-    "cache_write": 4266499,
-    "total": 83414747
+    "input": 341305,
+    "output": 4029810,
+    "cache_read": 373150264,
+    "cache_write": 16002548,
+    "total": 393523927
   },
-  "total_cost_usd": 70.326,
-  "readiness_score": 81,
+  "total_cost_usd": 240.42,
+  "readiness_score": 86,
   "readiness_breakdown": {
-    "engagement": 12,
+    "engagement": 18,
     "depth": 25,
-    "coverage": 14,
+    "coverage": 20,
     "progression": 15,
-    "friction": 15
+    "friction": 8
   },
   "top_3_use_cases": [
     "other",
-    "analysis",
-    "code_generation"
+    "code_generation",
+    "analysis"
   ],
   "top_models": [
     {
       "model": "claude-sonnet-4-6",
-      "sessions": 8,
-      "cost_usd": 28.146
+      "sessions": 44,
+      "cost_usd": 192.562
     },
     {
       "model": "claude-haiku-4-5-20251001",
+      "sessions": 8,
+      "cost_usd": 4.811
+    },
+    {
+      "model": "claude-opus-4-8",
+      "sessions": 5,
+      "cost_usd": 43.027
+    },
+    {
+      "model": "copilot/auto",
+      "sessions": 5,
+      "cost_usd": 0
+    },
+    {
+      "model": "gemini-antigravity",
       "sessions": 3,
-      "cost_usd": 1.344
-    },
-    {
-      "model": "claude-opus-4-7",
-      "sessions": 2,
-      "cost_usd": 40.815
-    },
-    {
-      "model": "gpt-5.5",
-      "sessions": 1,
-      "cost_usd": 0.021
+      "cost_usd": 0.012
     }
   ],
   "top_projects": [
     {
-      "project": "C--Users-shimp",
+      "project": "aiops-server",
+      "sessions": 6,
+      "cost_usd": 50.013
+    },
+    {
+      "project": "Aiops-setup",
+      "sessions": 6,
+      "cost_usd": 42.944
+    },
+    {
+      "project": "server-aiops-agent",
       "sessions": 2,
-      "cost_usd": 40.815
+      "cost_usd": 18.435
     },
     {
-      "project": "shimp",
-      "sessions": 4,
-      "cost_usd": 21.44
-    },
-    {
-      "project": "Downloads-Aiops-setup",
-      "sessions": 1,
-      "cost_usd": 2.902
-    },
-    {
-      "project": "Aiops-elliot-setup",
-      "sessions": 1,
-      "cost_usd": 2.716
-    },
-    {
-      "project": "subagents",
+      "project": "Aiops-npm",
       "sessions": 3,
-      "cost_usd": 1.344
+      "cost_usd": 18.356
+    },
+    {
+      "project": "AIOps-Insights-master",
+      "sessions": 2,
+      "cost_usd": 17.977
     }
   ]
 }
