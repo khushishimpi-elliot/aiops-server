@@ -7,12 +7,12 @@ const DEV_COLORS = ['#FF6600','#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899']
 const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#6b7280']
 
 const ALL_TOOLS = [
-  'claude_code','copilot','cursor','gemini','windsurf','cline',
+  'claude','copilot','cursor','gemini','windsurf','cline',
   'roo','kilo','codex','pi',
 ]
 
 const TOOL_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  claude_code: { bg: '#fff3ec', color: '#FF6600',  label: 'Claude Code' },
+  claude:      { bg: '#fff3ec', color: '#FF6600',  label: 'Claude Code' },
   copilot:     { bg: '#f1f5f9', color: '#374151',  label: 'Copilot' },
   cursor:      { bg: '#eef2ff', color: '#6366f1',  label: 'Cursor' },
   gemini:      { bg: '#eff6ff', color: '#3b82f6',  label: 'Gemini' },
