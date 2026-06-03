@@ -1383,7 +1383,7 @@ program
 program
   .command('sync')
   .description('Send data to company server')
-  .option('--days <n>', 'How many days of data to send', '1')
+  .option('--days <n>', 'How many days of data to send', '30')
   .option('--dry-run', 'Preview what would be sent without sending')
   .action(async (opts: { days?: string; dryRun?: boolean }) => {
     if (!isEnrolled()) {

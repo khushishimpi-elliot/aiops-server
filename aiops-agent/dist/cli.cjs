@@ -16335,7 +16335,7 @@ program.command("enroll").description("Connect to company server with your work 
   console.log(source_default.dim("  Run aiops sync to send your data"));
   console.log();
 });
-program.command("sync").description("Send data to company server").option("--days <n>", "How many days of data to send", "1").option("--dry-run", "Preview what would be sent without sending").action(async (opts) => {
+program.command("sync").description("Send data to company server").option("--days <n>", "How many days of data to send", "30").option("--dry-run", "Preview what would be sent without sending").action(async (opts) => {
   if (!isEnrolled()) {
     console.log(source_default.yellow("\n  Not enrolled yet."));
     console.log(source_default.dim("  Run: aiops enroll --server URL --token TOKEN\n"));

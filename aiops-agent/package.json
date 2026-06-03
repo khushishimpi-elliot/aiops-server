@@ -17,7 +17,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "npx esbuild src/cli.ts --bundle --platform=node --target=node18 --external:better-sqlite3 --format=cjs --define:import.meta.url=__filename --outfile=dist/cli.cjs && node -e \"if(process.platform!=='win32')require('fs').chmodSync('dist/cli.cjs',0o755)\"",
+    "build": "npx esbuild src/cli.ts --bundle --platform=node --target=node18 --external:better-sqlite3 --external:fsevents --format=cjs --define:import.meta.url=__filename --outfile=dist/cli.cjs && node -e \"if(process.platform!=='win32')require('fs').chmodSync('dist/cli.cjs',0o755)\"",
     "prepare": "npm run build || node -e \"process.exit(require('fs').existsSync('dist/cli.cjs')?0:1)\"",
     "start": "node dist/cli.js",
     "setup": "node -e \"require('os').platform()==='win32'?require('child_process').execSync('setup.bat',{stdio:'inherit'}):require('child_process').execSync('bash setup.sh',{stdio:'inherit'})\"",
