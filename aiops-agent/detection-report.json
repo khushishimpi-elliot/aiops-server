@@ -1,5 +1,5 @@
 {
-  "report_generated": "2026-06-03T10:02:11.399Z",
+  "report_generated": "2026-06-03T11:05:31.193Z",
   "period": "last_28_days",
   "tools_detected": [
     "Claude Code",
@@ -12,19 +12,19 @@
     "Pi"
   ],
   "engagement": {
-    "total_sessions": 71,
+    "total_sessions": 72,
     "sessions_per_week": {
       "W1": 6,
       "W2": 36,
       "W3": 6,
-      "W4": 21
+      "W4": 22
     },
     "active_days": 16,
     "active_days_per_week": 4,
-    "total_user_prompts": 3252
+    "total_user_prompts": 3275
   },
   "depth": {
-    "avg_turns_per_session": 116.7,
+    "avg_turns_per_session": 116.1,
     "multi_turn_rate": 79,
     "deep_session_rate": 79,
     "longest_session_turns": 554
@@ -32,8 +32,8 @@
   "task_coverage": {
     "task_category_breakdown": {
       "other": {
-        "count": 42,
-        "pct": 59
+        "count": 43,
+        "pct": 60
       },
       "code_generation": {
         "count": 12,
@@ -60,9 +60,9 @@
     "task_diversity_score": 75
   },
   "progression": {
-    "week_over_week_trend": 250,
+    "week_over_week_trend": 267,
     "tools_used": {
-      "Claude Code": 56,
+      "Claude Code": 57,
       "GitHub Copilot": 5,
       "Gemini CLI": 4,
       "Cursor": 1,
@@ -79,13 +79,13 @@
     "longest_gap_days": 3
   },
   "tokens": {
-    "input": 328707,
-    "output": 3984514,
-    "cache_read": 370277423,
-    "cache_write": 15852933,
-    "total": 390443577
+    "input": 341305,
+    "output": 4029810,
+    "cache_read": 373150264,
+    "cache_write": 16002548,
+    "total": 393523927
   },
-  "total_cost_usd": 236.853,
+  "total_cost_usd": 240.42,
   "readiness_score": 86,
   "readiness_breakdown": {
     "engagement": 18,
@@ -111,14 +111,14 @@
       "cost_usd": 4.811
     },
     {
+      "model": "claude-opus-4-8",
+      "sessions": 5,
+      "cost_usd": 43.027
+    },
+    {
       "model": "copilot/auto",
       "sessions": 5,
       "cost_usd": 0
-    },
-    {
-      "model": "claude-opus-4-8",
-      "sessions": 4,
-      "cost_usd": 39.46
     },
     {
       "model": "gemini-antigravity",
@@ -129,8 +129,8 @@
   "top_projects": [
     {
       "project": "aiops-server",
-      "sessions": 5,
-      "cost_usd": 46.446
+      "sessions": 6,
+      "cost_usd": 50.013
     },
     {
       "project": "Aiops-setup",

@@ -37,9 +37,16 @@ function displayToolName(tool: string): string {
   return TOOL_BADGE[tool.toLowerCase()]?.label ?? tool
 }
 
+interface NormalizedCategory {
+  category: string
+  session_count: number
+  pct: number
+  others?: { category: string; session_count: number }[]
+}
+
 function normalizeCategories(
   cats: { category: string; session_count: number; pct: number }[]
-): { category: string; session_count: number; pct: number }[] {
+): NormalizedCategory[] {
   const MAIN = [
     'code_generation',
     'testing',
@@ -54,6 +61,7 @@ function normalizeCategories(
     debugging:       0,
     other:           0,
   }
+  const otherItems: { category: string; session_count: number }[] = []
 
   for (const c of cats) {
     const key = c.category.toLowerCase().trim()
@@ -61,6 +69,7 @@ function normalizeCategories(
       normalized[key] += c.session_count
     } else {
       normalized['other'] += c.session_count
+      otherItems.push({ category: c.category, session_count: c.session_count })
     }
   }
 
@@ -73,6 +82,9 @@ function normalizeCategories(
       category,
       session_count,
       pct: Math.round((session_count / total) * 100),
+      ...(category === 'other'
+        ? { others: [...otherItems].sort((a, b) => b.session_count - a.session_count) }
+        : {}),
     }))
     .sort((a, b) => b.session_count - a.session_count)
 }
@@ -91,9 +103,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const [data, setData] = useState<DevDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [breakdownExpanded, setBreakdownExpanded] = useState(false)
+  const [othersExpanded, setOthersExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null); setBreakdownExpanded(false)
+    setLoading(true); setData(null); setBreakdownExpanded(false); setOthersExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -264,20 +277,41 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               {data.task_categories.length > 0 && (
                 <div className="drawer-section">
                   <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
-                  {normalizeCategories(data.task_categories || []).map((c, i) => (
-                    <div key={c.category} style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{c.category}</span>
+                  {normalizeCategories(data.task_categories || []).map((c, i) => {
+                    const hasOthers = c.category === 'other' && !!c.others && c.others.length > 0
+                    return (
+                      <div key={c.category} style={{ marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <div
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: hasOthers ? 'pointer' : 'default', userSelect: 'none' }}
+                            onClick={hasOthers ? () => setOthersExpanded(v => !v) : undefined}
+                          >
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{c.category}</span>
+                            {hasOthers && (
+                              <span style={{ fontSize: 9, color: 'var(--gray-400)' }}>
+                                {othersExpanded ? '▲' : '▼'} ({c.others!.length})
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
+                        <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
+                          <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
+                        </div>
+                        {hasOthers && othersExpanded && (
+                          <div style={{ marginTop: 6, marginLeft: 16, paddingLeft: 10, borderLeft: '1px solid var(--gray-200)' }}>
+                            {c.others!.map(o => (
+                              <div key={o.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--gray-500)', padding: '2px 0' }}>
+                                <span>{o.category}</span>
+                                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{o.session_count} sessions</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
-                        <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 

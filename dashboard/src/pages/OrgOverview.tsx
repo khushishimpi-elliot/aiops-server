@@ -34,9 +34,13 @@ function avatarLetter(email: string): string {
 
 const DEV_COLORS = ['#FF6600','#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899']
 
+interface NormalizedCategory extends TaskCategoryItem {
+  others?: { category: string; session_count: number }[]
+}
+
 function normalizeCategories(
   cats: TaskCategoryItem[]
-): TaskCategoryItem[] {
+): NormalizedCategory[] {
   const MAIN = [
     'code_generation',
     'testing',
@@ -51,6 +55,7 @@ function normalizeCategories(
     debugging:       0,
     other:           0,
   }
+  const otherItems: { category: string; session_count: number }[] = []
 
   for (const c of cats) {
     const key = c.category.toLowerCase().trim()
@@ -58,6 +63,7 @@ function normalizeCategories(
       normalized[key] += c.session_count
     } else {
       normalized['other'] += c.session_count
+      otherItems.push({ category: c.category, session_count: c.session_count })
     }
   }
 
@@ -70,6 +76,9 @@ function normalizeCategories(
       category,
       session_count,
       pct: Math.round((session_count / total) * 100),
+      ...(category === 'other'
+        ? { others: [...otherItems].sort((a, b) => b.session_count - a.session_count) }
+        : {}),
     }))
     .sort((a, b) => b.session_count - a.session_count)
 }
@@ -81,6 +90,7 @@ export default function OrgOverview() {
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [othersExpanded, setOthersExpanded] = useState(false)
 
   function fetchData(clear = false) {
     if (clear) { setData(null); setDevs(null) }
@@ -433,23 +443,45 @@ export default function OrgOverview() {
                     <p className="no-data">No category data yet — run <code>python aiops.py report</code></p>
                   ) : (
                     <div className="cat-list">
-                      {normalizeCategories(data.task_categories).map((c: TaskCategoryItem, i: number) => (
-                        <div className="cat-row" key={c.category}>
-                          <div className="cat-meta">
-                            <div className="cat-label-wrap">
-                              <div className="cat-dot" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />
-                              {c.category}
+                      {normalizeCategories(data.task_categories).map((c: NormalizedCategory, i: number) => {
+                        const hasOthers = c.category === 'other' && !!c.others && c.others.length > 0
+                        return (
+                          <div className="cat-row" key={c.category}>
+                            <div className="cat-meta">
+                              <div
+                                className="cat-label-wrap"
+                                style={{ cursor: hasOthers ? 'pointer' : 'default', userSelect: 'none' }}
+                                onClick={hasOthers ? () => setOthersExpanded(v => !v) : undefined}
+                              >
+                                <div className="cat-dot" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />
+                                {c.category}
+                                {hasOthers && (
+                                  <span style={{ fontSize: 9, color: 'var(--gray-500)', marginLeft: 4 }}>
+                                    {othersExpanded ? '▲' : '▼'} ({c.others!.length})
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>{c.session_count} sessions</span>
+                                <div className="cat-pct">{c.pct}%</div>
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                              <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>{c.session_count} sessions</span>
-                              <div className="cat-pct">{c.pct}%</div>
+                            <div className="cat-track">
+                              <div className="cat-fill" style={{ width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length] }} />
                             </div>
+                            {hasOthers && othersExpanded && (
+                              <div style={{ marginTop: 8, marginLeft: 18, paddingLeft: 10, borderLeft: '1px solid var(--gray-200)' }}>
+                                {c.others!.map(o => (
+                                  <div key={o.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--gray-500)', padding: '2px 0' }}>
+                                    <span>{o.category}</span>
+                                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{o.session_count} sessions</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <div className="cat-track">
-                            <div className="cat-fill" style={{ width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length] }} />
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
