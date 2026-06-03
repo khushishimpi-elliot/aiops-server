@@ -77,6 +77,8 @@ CREATE TABLE usage (
     cache_read_tokens    bigint      NOT NULL DEFAULT 0 CHECK (cache_read_tokens  >= 0),
     cache_write_tokens   bigint      NOT NULL DEFAULT 0 CHECK (cache_write_tokens >= 0),
     cost_millicents      bigint      NOT NULL CHECK (cost_millicents >= 0),  -- 1/1000 of a cent
+    sessions             int         NOT NULL DEFAULT 0 CHECK (sessions    >= 0),
+    total_turns          int         NOT NULL DEFAULT 0 CHECK (total_turns >= 0),
     idempotency_key      text        NOT NULL,   -- agent-generated; hash(user+device+date+tool+model)
     recorded_at          timestamptz NOT NULL DEFAULT now(),
     UNIQUE (idempotency_key)

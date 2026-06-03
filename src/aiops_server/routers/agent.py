@@ -3,7 +3,6 @@ import secrets
 from datetime import date as date_type
 
 import asyncpg
-from asyncpg.exceptions import UniqueViolationError
 from fastapi import APIRouter, Depends, Header
 
 from ..config import Config, get_config
@@ -135,8 +134,13 @@ async def agent_sync(
 
     device_id: int = device["id"]
     user_id: int = device["user_id"]
-    stored = 0
 
+    # Build the full set of rows up front, then persist with batched
+    # executemany() calls inside a single transaction. Doing one awaited
+    # INSERT per aggregate previously meant ~2 sequential DB round-trips per
+    # row, which made large rollups take 20s+ and time out the client.
+    usage_rows = []
+    category_rows = []
     for agg in body.aggregates:
         parsed_date = date_type.fromisoformat(agg.date)
         cost_millicents = round(agg.cost_usd * 100_000)
@@ -147,43 +151,67 @@ async def agent_sync(
             f"{token_hash}:{agg.date}:{agg.tool}:{agg.model}:{agg.category or ''}".encode()
         ).hexdigest()[:64]
 
-        try:
-            await conn.execute(
+        usage_rows.append((
+            user_id, device_id, parsed_date,
+            agg.tool, agg.model,
+            agg.input_tokens, agg.output_tokens,
+            cache_read, cache_write,
+            cost_millicents, agg.sessions, agg.total_turns, ikey,
+        ))
+
+        if agg.category:
+            cat_ikey = hashlib.sha256(f"{ikey}:cat".encode()).hexdigest()[:64]
+            category_rows.append((
+                user_id, device_id, parsed_date,
+                agg.category, agg.sessions, cat_ikey,
+            ))
+
+    # The agent re-sends cumulative daily totals on every sync, so a colliding
+    # idempotency_key means "this day was re-synced with fresher numbers" — we
+    # overwrite (last-write-wins) rather than DO NOTHING, which would freeze a
+    # day's totals at the first sync and hide later sessions from the dashboard.
+    async with conn.transaction():
+        if usage_rows:
+            await conn.executemany(
                 """
                 INSERT INTO usage(
                     user_id, device_id, date, tool, model,
                     input_tokens, output_tokens,
                     cache_read_tokens, cache_write_tokens,
-                    cost_millicents, idempotency_key
+                    cost_millicents, sessions, total_turns, idempotency_key
                 )
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-                ON CONFLICT (idempotency_key) DO NOTHING
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    input_tokens       = EXCLUDED.input_tokens,
+                    output_tokens      = EXCLUDED.output_tokens,
+                    cache_read_tokens  = EXCLUDED.cache_read_tokens,
+                    cache_write_tokens = EXCLUDED.cache_write_tokens,
+                    cost_millicents    = EXCLUDED.cost_millicents,
+                    sessions           = EXCLUDED.sessions,
+                    total_turns        = EXCLUDED.total_turns,
+                    recorded_at        = now()
                 """,
-                user_id, device_id, parsed_date,
-                agg.tool, agg.model,
-                agg.input_tokens, agg.output_tokens,
-                cache_read, cache_write,
-                cost_millicents, ikey,
+                usage_rows,
             )
-            stored += 1
-        except UniqueViolationError:
-            pass
 
-        if agg.category:
-            cat_ikey = hashlib.sha256(f"{ikey}:cat".encode()).hexdigest()[:64]
-            await conn.execute(
+        if category_rows:
+            await conn.executemany(
                 """
                 INSERT INTO usage_categories(user_id, device_id, date, category, session_count, idempotency_key)
                 VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (idempotency_key) DO NOTHING
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    session_count = EXCLUDED.session_count,
+                    recorded_at   = now()
                 """,
-                user_id, device_id, parsed_date,
-                agg.category, agg.sessions, cat_ikey,
+                category_rows,
             )
 
-    await conn.execute(
-        "UPDATE devices SET last_seen_at = now() WHERE id = $1",
-        device_id,
-    )
+        await conn.execute(
+            "UPDATE devices SET last_seen_at = now() WHERE id = $1",
+            device_id,
+        )
 
-    return {"ok": True, "stored": stored, "total": len(body.aggregates)}
+    # ON CONFLICT DO NOTHING means some rows may already exist; we report the
+    # number submitted rather than tracking per-row insert results (executemany
+    # does not return rowcounts).
+    return {"ok": True, "stored": len(usage_rows), "total": len(body.aggregates)}

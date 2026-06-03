@@ -15213,7 +15213,10 @@ async function syncToServer(days, dryRun) {
           "x-enrollment-token": config.enrollmentToken
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(15e3)
+        // Generous timeout: the server may be cold-starting (Render free tier
+        // can take 30-60s to wake) and large rollups take a few seconds to
+        // persist. A short timeout aborts mid-write and reports a false failure.
+        signal: AbortSignal.timeout(6e4)
       });
       if (res.ok) {
         return {
