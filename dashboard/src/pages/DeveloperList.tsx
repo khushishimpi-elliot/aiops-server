@@ -52,6 +52,8 @@ function normalizeCategories(
     'testing',
     'configuration',
     'debugging',
+    'automation',
+    'research',
   ]
 
   const normalized: Record<string, number> = {
@@ -59,6 +61,8 @@ function normalizeCategories(
     testing:         0,
     configuration:   0,
     debugging:       0,
+    automation:      0,
+    research:        0,
     other:           0,
   }
   const otherItems: { category: string; session_count: number }[] = []
@@ -97,6 +101,38 @@ function isActive(lastActive: string | null): boolean {
 const WEEKLY_BUDGET_MC  = 15_000 * 100
 const MONTHLY_BUDGET_MC = 50_000 * 100
 
+function ExpandToggle({ expanded, onToggle, collapsedLabel }: {
+  expanded: boolean; onToggle: () => void; collapsedLabel: string
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        width:        '100%',
+        marginTop:    '8px',
+        padding:      '8px',
+        background:   'transparent',
+        border:       '1px solid var(--gray-200)',
+        borderRadius: '6px',
+        fontSize:     '12px',
+        color:        'var(--gray-500)',
+        cursor:       'pointer',
+        transition:   'all 0.15s',
+      }}
+      onMouseEnter={e => {
+        (e.target as HTMLButtonElement).style.background = 'var(--gray-50)'
+        ;(e.target as HTMLButtonElement).style.color = 'var(--brand)'
+      }}
+      onMouseLeave={e => {
+        (e.target as HTMLButtonElement).style.background = 'transparent'
+        ;(e.target as HTMLButtonElement).style.color = 'var(--gray-500)'
+      }}
+    >
+      {expanded ? '▲ Show less' : collapsedLabel}
+    </button>
+  )
+}
+
 function DevDrawer({ email, colorIdx, days, onClose }: {
   email: string; colorIdx: number; days: number; onClose: () => void
 }) {
@@ -104,9 +140,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const [loading, setLoading] = useState(true)
   const [breakdownExpanded, setBreakdownExpanded] = useState(false)
   const [othersExpanded, setOthersExpanded] = useState(false)
+  const [modelsExpanded, setModelsExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null); setBreakdownExpanded(false); setOthersExpanded(false)
+    setLoading(true); setData(null); setBreakdownExpanded(false); setOthersExpanded(false); setModelsExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -375,39 +412,11 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                     </table>
 
                     {data.by_tool_model.length > 5 && (
-                      <button
-                        onClick={() =>
-                          setBreakdownExpanded(!breakdownExpanded)
-                        }
-                        style={{
-                          width:           '100%',
-                          marginTop:       '8px',
-                          padding:         '8px',
-                          background:      'transparent',
-                          border:          '1px solid var(--gray-200)',
-                          borderRadius:    '6px',
-                          fontSize:        '12px',
-                          color:           'var(--gray-500)',
-                          cursor:          'pointer',
-                          transition:      'all 0.15s',
-                        }}
-                        onMouseEnter={e => {
-                          (e.target as HTMLButtonElement).style.background =
-                            'var(--gray-50)'
-                          ;(e.target as HTMLButtonElement).style.color =
-                            'var(--brand)'
-                        }}
-                        onMouseLeave={e => {
-                          (e.target as HTMLButtonElement).style.background =
-                            'transparent'
-                          ;(e.target as HTMLButtonElement).style.color =
-                            'var(--gray-500)'
-                        }}
-                      >
-                        {breakdownExpanded
-                          ? '▲ Show less'
-                          : `▼ View all ${data.by_tool_model.length} entries`}
-                      </button>
+                      <ExpandToggle
+                        expanded={breakdownExpanded}
+                        onToggle={() => setBreakdownExpanded(!breakdownExpanded)}
+                        collapsedLabel={`▼ View all ${data.by_tool_model.length} entries`}
+                      />
                     )}
                   </>
                 )}
@@ -496,17 +505,26 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Models Used</div>
                 {modelTotals.length === 0 ? <p className="no-data">No model data yet</p> : (
-                  modelTotals.map(m => (
-                    <div className="drawer-bar-row" key={m.model}>
-                      <span className="drawer-bar-label wide">{m.model}</span>
-                      <div className="drawer-bar-track">
-                        <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
+                  <>
+                    {(modelsExpanded ? modelTotals : modelTotals.slice(0, 5)).map(m => (
+                      <div className="drawer-bar-row" key={m.model}>
+                        <span className="drawer-bar-label wide">{m.model}</span>
+                        <div className="drawer-bar-track">
+                          <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
+                        </div>
+                        <span className="drawer-bar-val">
+                          {m.sessions} sessions{m.cost > 0 ? ' · ' + formatCost(m.cost) : ' · —'}
+                        </span>
                       </div>
-                      <span className="drawer-bar-val">
-                        {m.sessions} sessions{m.cost > 0 ? ' · ' + formatCost(m.cost) : ' · —'}
-                      </span>
-                    </div>
-                  ))
+                    ))}
+                    {modelTotals.length > 5 && (
+                      <ExpandToggle
+                        expanded={modelsExpanded}
+                        onToggle={() => setModelsExpanded(!modelsExpanded)}
+                        collapsedLabel={`▼ View all ${modelTotals.length} models`}
+                      />
+                    )}
+                  </>
                 )}
               </div>
 

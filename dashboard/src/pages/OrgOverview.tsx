@@ -46,6 +46,8 @@ function normalizeCategories(
     'testing',
     'configuration',
     'debugging',
+    'automation',
+    'research',
   ]
 
   const normalized: Record<string, number> = {
@@ -53,6 +55,8 @@ function normalizeCategories(
     testing:         0,
     configuration:   0,
     debugging:       0,
+    automation:      0,
+    research:        0,
     other:           0,
   }
   const otherItems: { category: string; session_count: number }[] = []
