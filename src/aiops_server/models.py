@@ -15,6 +15,21 @@ class DiscoverResponse(BaseModel):
     allowed: bool
 
 
+class UserStatusResponse(BaseModel):
+    registered: bool
+
+
+class PasswordAuthRequest(BaseModel):
+    model_config = ConfigDict(strict=True)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordAuthResponse(BaseModel):
+    enrollment_token: str
+    is_new_user: bool
+
+
 class SendOtpRequest(BaseModel):
     model_config = ConfigDict(strict=True)
     email: EmailStr

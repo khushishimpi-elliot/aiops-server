@@ -1277,7 +1277,7 @@ program.command('serve')
 
 program
   .command('enroll')
-  .description('Connect to company server via email OTP')
+  .description('Connect to company server with your work email and password')
   .requiredOption('--server <url>', 'Company server URL')
   .option('--email <email>', 'Work email address (prompted if omitted)')
   .action(async (opts: { server: string; email?: string }) => {
@@ -1290,9 +1290,44 @@ program
       });
     }
 
+    function promptPassword(question: string): Promise<string> {
+      return new Promise(resolve => {
+        const stdin = process.stdin as NodeJS.ReadStream & { setRawMode?: (mode: boolean) => void };
+        if (!process.stdout.isTTY || typeof stdin.setRawMode !== 'function') {
+          // Non-TTY fallback: read normally (no masking)
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          rl.question(question, answer => { rl.close(); resolve(answer); });
+          return;
+        }
+        process.stdout.write(question);
+        let pw = '';
+        stdin.setRawMode(true);
+        stdin.setEncoding('utf8');
+        stdin.resume();
+        const onData = (char: string) => {
+          if (char === '\r' || char === '\n') {
+            stdin.setRawMode!(false);
+            stdin.pause();
+            stdin.removeListener('data', onData);
+            process.stdout.write('\n');
+            resolve(pw);
+          } else if (char === '') { // Ctrl+C
+            stdin.setRawMode!(false);
+            process.stdout.write('\n');
+            process.exit(1);
+          } else if (char === '' || char === '\b') { // Backspace
+            if (pw.length > 0) pw = pw.slice(0, -1);
+          } else if (char >= ' ') {
+            pw += char;
+          }
+        };
+        stdin.on('data', onData);
+      });
+    }
+
     const serverUrl = opts.server.replace(/\/$/, '');
     const machineId = getMachineId();
-    const TIMEOUT_MS = 90_000; // Render free tier cold-starts can exceed 60s
+    const TIMEOUT_MS = 90_000;
 
     async function fetchWithRetry(url: string, init: RequestInit, retries = 3): Promise<Response> {
       for (let i = 1; i <= retries; i++) {
@@ -1315,7 +1350,7 @@ program
       process.exit(1);
     }
 
-    // Step 2: check domain is allowed
+    // Step 2: check domain allowed + wake server
     try {
       const discoverRes = await fetchWithRetry(serverUrl + '/enroll/discover', {
         method: 'POST',
@@ -1330,51 +1365,63 @@ program
         }
       }
     } catch {
-      console.log(chalk.yellow('  Could not reach server to verify domain — continuing'));
+      console.log(chalk.yellow('  Could not reach server — continuing'));
     }
 
-    // Step 3: request OTP — auto-retries up to 3 times if server is cold-starting
-    console.log(chalk.dim('\n  Sending one-time code to ' + email + '...'));
+    // Step 3: check if this is a new user or returning user
+    let isNewUser = true;
     try {
-      const otpRes = await fetchWithRetry(serverUrl + '/enroll/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      if (!otpRes.ok) {
-        const err = await otpRes.json().catch(() => ({})) as Record<string, unknown>;
-        console.error(chalk.red('  Failed to send OTP: ' + String(err['error'] ?? otpRes.status)));
+      const statusRes = await fetchWithRetry(
+        serverUrl + '/enroll/user-status?email=' + encodeURIComponent(email),
+        { method: 'GET' },
+      );
+      if (statusRes.ok) {
+        const { registered } = await statusRes.json() as { registered: boolean };
+        isNewUser = !registered;
+      }
+    } catch { /* server unreachable — assume new */ }
+
+    // Step 4: prompt for password (confirm only on first registration)
+    let password: string;
+    if (isNewUser) {
+      console.log(chalk.dim('\n  First time? Set a password for your account.'));
+      password = await promptPassword('  Choose a password (min 8 chars): ');
+      if (password.length < 8) {
+        console.error(chalk.red('  Password must be at least 8 characters'));
         process.exit(1);
       }
-    } catch (e) {
-      console.error(chalk.red('  Server unreachable after 3 attempts: ' + String(e)));
-      process.exit(1);
+      const confirm = await promptPassword('  Confirm password: ');
+      if (password !== confirm) {
+        console.error(chalk.red('  Passwords do not match'));
+        process.exit(1);
+      }
+    } else {
+      console.log(chalk.dim('\n  Welcome back! Enter your password to continue.'));
+      password = await promptPassword('  Password: ');
     }
 
-    // Step 4: get OTP code from user
-    const code = await prompt('  Enter 6-digit code from your email: ');
-    if (!/^\d{6}$/.test(code)) {
-      console.error(chalk.red('  Code must be 6 digits'));
-      process.exit(1);
-    }
-
-    // Step 5: verify OTP → enrollment_token
+    // Step 5: authenticate → enrollment_token
     let enrollmentToken = '';
     try {
-      const verifyRes = await fetchWithRetry(serverUrl + '/enroll/verify-otp', {
+      const authRes = await fetchWithRetry(serverUrl + '/enroll/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, password }),
       });
-      if (!verifyRes.ok) {
-        const err = await verifyRes.json().catch(() => ({})) as Record<string, unknown>;
-        console.error(chalk.red('  Invalid or expired code: ' + String(err['error'] ?? verifyRes.status)));
+      if (!authRes.ok) {
+        const err = await authRes.json().catch(() => ({})) as Record<string, unknown>;
+        const msg = String(err['error'] ?? authRes.status);
+        if (msg === 'invalid_credentials') {
+          console.error(chalk.red('  Incorrect password. Try again or contact your admin.'));
+        } else {
+          console.error(chalk.red('  Authentication failed: ' + msg));
+        }
         process.exit(1);
       }
-      const body = await verifyRes.json() as { enrollment_token: string };
+      const body = await authRes.json() as { enrollment_token: string };
       enrollmentToken = body.enrollment_token;
     } catch (e) {
-      console.error(chalk.red('  Verification failed: ' + String(e)));
+      console.error(chalk.red('  Server error during authentication: ' + String(e)));
       process.exit(1);
     }
 

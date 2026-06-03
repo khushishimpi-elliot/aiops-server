@@ -1,6 +1,7 @@
 import asyncio
 import asyncpg
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+import bcrypt
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from ..config import Config, get_config
@@ -11,8 +12,11 @@ from ..models import (
     DiscoverResponse,
     EnrollRequest,
     EnrollResponse,
+    PasswordAuthRequest,
+    PasswordAuthResponse,
     SendOtpRequest,
     SendOtpResponse,
+    UserStatusResponse,
     VerifyOtpRequest,
     VerifyOtpResponse,
 )
@@ -41,6 +45,62 @@ async def discover(
         "SELECT 1 FROM domains WHERE domain = $1", domain
     )
     return DiscoverResponse(allowed=bool(exists))
+
+
+@router.get("/user-status", response_model=UserStatusResponse)
+async def user_status(
+    email: str = Query(min_length=3),
+    conn: asyncpg.Connection = Depends(get_db),
+) -> UserStatusResponse:
+    row = await conn.fetchrow(
+        "SELECT password_hash FROM users WHERE email = $1 AND deleted_at IS NULL",
+        email.lower(),
+    )
+    return UserStatusResponse(registered=bool(row and row["password_hash"]))
+
+
+@router.post("/auth", response_model=PasswordAuthResponse)
+async def password_auth(
+    body: PasswordAuthRequest,
+    conn: asyncpg.Connection = Depends(get_db),
+    config: Config = Depends(get_config),
+) -> PasswordAuthResponse:
+    email = str(body.email).lower()
+    domain = email.split("@")[1]
+
+    team_id = await conn.fetchval("SELECT team_id FROM domains WHERE domain = $1", domain)
+    if team_id is None:
+        raise AppError(403, "domain_not_allowed")
+
+    user_row = await conn.fetchrow(
+        "SELECT id, password_hash, deleted_at FROM users WHERE email = $1", email
+    )
+    if user_row and user_row["deleted_at"] is not None:
+        raise AppError(403, "user_purged")
+
+    is_new_user = False
+
+    if user_row and user_row["password_hash"]:
+        # Returning user — verify password
+        if not bcrypt.checkpw(body.password.encode(), user_row["password_hash"].encode()):
+            raise AppError(401, "invalid_credentials")
+    else:
+        # First registration — hash and store password
+        is_new_user = True
+        pw_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt(12)).decode()
+        if user_row:
+            await conn.execute(
+                "UPDATE users SET password_hash = $1 WHERE id = $2",
+                pw_hash, user_row["id"],
+            )
+        else:
+            await conn.execute(
+                "INSERT INTO users(team_id, email, password_hash) VALUES($1, $2, $3)",
+                team_id, email, pw_hash,
+            )
+
+    token = _serializer(config).dumps({"email": email})
+    return PasswordAuthResponse(enrollment_token=token, is_new_user=is_new_user)
 
 
 @router.post("/send-otp", response_model=SendOtpResponse)
