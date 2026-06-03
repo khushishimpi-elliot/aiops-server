@@ -22,8 +22,7 @@ _TOOL_MODEL_SQL = """
            SUM(cost_millicents)::bigint  AS cost_millicents,
            SUM(input_tokens)::bigint     AS input_tokens,
            SUM(output_tokens)::bigint    AS output_tokens,
-           COUNT(DISTINCT date)::int     AS days_active,
-           SUM(sessions)::int            AS session_count
+           COUNT(DISTINCT date)::int     AS days_active
     FROM   usage
     WHERE  {where}
     GROUP BY tool, model
@@ -129,7 +128,7 @@ async def developer_detail(
     daily_tool_rows = await conn.fetch(
         """
         SELECT date, tool, model,
-               SUM(sessions)::int          AS session_count,
+               COUNT(*)::int               AS session_count,
                SUM(input_tokens)::bigint   AS input_tokens,
                SUM(output_tokens)::bigint  AS output_tokens,
                SUM(cost_millicents)::bigint AS cost_millicents
@@ -191,7 +190,7 @@ async def developer_detail(
                 input_tokens=r["input_tokens"],
                 output_tokens=r["output_tokens"],
                 days_active=r["days_active"],
-                session_count=r["session_count"],
+                session_count=r["days_active"],
             )
             for r in breakdown_rows
         ],
@@ -285,7 +284,7 @@ async def org_overview(
                 input_tokens=r["input_tokens"],
                 output_tokens=r["output_tokens"],
                 days_active=r["days_active"],
-                session_count=r["session_count"],
+                session_count=r["days_active"],
             )
             for r in breakdown_rows
         ],
