@@ -23,6 +23,12 @@ function displayToolName(tool: string): string {
   return TOOL_DISPLAY_NAMES[tool.toLowerCase()] ?? tool
 }
 
+function formatCategory(category: string): string {
+  return category
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function nameFromEmail(email: string): string {
   const local = email.split('@')[0]
   return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
@@ -458,7 +464,7 @@ export default function OrgOverview() {
                                 onClick={hasOthers ? () => setOthersExpanded(v => !v) : undefined}
                               >
                                 <div className="cat-dot" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />
-                                {c.category}
+                                {formatCategory(c.category)}
                                 {hasOthers && (
                                   <span style={{ fontSize: 9, color: 'var(--gray-500)', marginLeft: 4 }}>
                                     {othersExpanded ? '▲' : '▼'} ({c.others!.length})
@@ -477,7 +483,7 @@ export default function OrgOverview() {
                               <div style={{ marginTop: 8, marginLeft: 18, paddingLeft: 10, borderLeft: '1px solid var(--gray-200)' }}>
                                 {c.others!.map(o => (
                                   <div key={o.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--gray-500)', padding: '2px 0' }}>
-                                    <span>{o.category}</span>
+                                    <span>{formatCategory(o.category)}</span>
                                     <span style={{ fontVariantNumeric: 'tabular-nums' }}>{o.session_count} sessions</span>
                                   </div>
                                 ))}

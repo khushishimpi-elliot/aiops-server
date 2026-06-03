@@ -37,6 +37,12 @@ function displayToolName(tool: string): string {
   return TOOL_BADGE[tool.toLowerCase()]?.label ?? tool
 }
 
+function formatCategory(category: string): string {
+  return category
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
 interface NormalizedCategory {
   category: string
   session_count: number
@@ -324,7 +330,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                             onClick={hasOthers ? () => setOthersExpanded(v => !v) : undefined}
                           >
                             <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{c.category}</span>
+                            <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{formatCategory(c.category)}</span>
                             {hasOthers && (
                               <span style={{ fontSize: 9, color: 'var(--gray-400)' }}>
                                 {othersExpanded ? '▲' : '▼'} ({c.others!.length})
@@ -340,7 +346,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                           <div style={{ marginTop: 6, marginLeft: 16, paddingLeft: 10, borderLeft: '1px solid var(--gray-200)' }}>
                             {c.others!.map(o => (
                               <div key={o.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--gray-500)', padding: '2px 0' }}>
-                                <span>{o.category}</span>
+                                <span>{formatCategory(o.category)}</span>
                                 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{o.session_count} sessions</span>
                               </div>
                             ))}
