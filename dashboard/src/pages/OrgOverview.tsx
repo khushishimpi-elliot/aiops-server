@@ -208,9 +208,8 @@ export default function OrgOverview() {
           >
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
+            <option value={60}>Last 60 days</option>
             <option value={90}>Last 90 days</option>
-            <option value={180}>Last 180 days</option>
-            <option value={365}>Last 1 year</option>
           </select>
         </div>
       </div>
