@@ -23,6 +23,10 @@ function displayToolName(tool: string): string {
   return TOOL_DISPLAY_NAMES[tool.toLowerCase()] ?? tool
 }
 
+function formatCategory(cat: string): string {
+  return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function nameFromEmail(email: string): string {
   const local = email.split('@')[0]
   return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
@@ -34,55 +38,6 @@ function avatarLetter(email: string): string {
 
 const DEV_COLORS = ['#FF6600','#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899']
 
-interface NormalizedCategory extends TaskCategoryItem {
-  others?: { category: string; session_count: number }[]
-}
-
-function normalizeCategories(
-  cats: TaskCategoryItem[]
-): NormalizedCategory[] {
-  const MAIN = [
-    'code_generation',
-    'testing',
-    'configuration',
-    'debugging',
-  ]
-
-  const normalized: Record<string, number> = {
-    code_generation: 0,
-    testing:         0,
-    configuration:   0,
-    debugging:       0,
-    other:           0,
-  }
-  const otherItems: { category: string; session_count: number }[] = []
-
-  for (const c of cats) {
-    const key = c.category.toLowerCase().trim()
-    if (MAIN.includes(key)) {
-      normalized[key] += c.session_count
-    } else {
-      normalized['other'] += c.session_count
-      otherItems.push({ category: c.category, session_count: c.session_count })
-    }
-  }
-
-  const total = Object.values(normalized)
-    .reduce((a, b) => a + b, 0) || 1
-
-  return Object.entries(normalized)
-    .filter(([, count]) => count > 0)
-    .map(([category, session_count]) => ({
-      category,
-      session_count,
-      pct: Math.round((session_count / total) * 100),
-      ...(category === 'other'
-        ? { others: [...otherItems].sort((a, b) => b.session_count - a.session_count) }
-        : {}),
-    }))
-    .sort((a, b) => b.session_count - a.session_count)
-}
-
 export default function OrgOverview() {
   const [days, setDays] = useState(90)
   const [data, setData] = useState<OrgOverviewResponse | null>(null)
@@ -90,7 +45,7 @@ export default function OrgOverview() {
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [refreshing, setRefreshing] = useState(false)
-  const [othersExpanded, setOthersExpanded] = useState(false)
+  const [otherExpanded, setOtherExpanded] = useState(false)
 
   function fetchData(clear = false) {
     if (clear) { setData(null); setDevs(null) }
@@ -158,6 +113,54 @@ export default function OrgOverview() {
   const topDev = sortedDevs[0]
 
   const topBarLabel = `Last ${days} days`
+
+  function normalizeCategories(
+    cats: TaskCategoryItem[]
+  ): TaskCategoryItem[] {
+    const MAIN = [
+      'code_generation',
+      'testing',
+      'configuration',
+      'debugging',
+      'automation',
+      'research',
+    ]
+
+    const normalized: Record<string, number> = {
+      code_generation: 0,
+      testing:         0,
+      configuration:   0,
+      debugging:       0,
+      automation:      0,
+      research:        0,
+      other:           0,
+    }
+
+    for (const c of cats) {
+      const key = c.category.toLowerCase().trim()
+      if (MAIN.includes(key)) {
+        normalized[key] += c.session_count
+      } else {
+        normalized['other'] += c.session_count
+      }
+    }
+
+    const total = Object.values(normalized)
+      .reduce((a, b) => a + b, 0) || 1
+
+    return Object.entries(normalized)
+      .filter(([, count]) => count > 0)
+      .map(([category, session_count]) => ({
+        category,
+        session_count,
+        pct: Math.round((session_count / total) * 100),
+      }))
+      .sort((a, b) => {
+        if (a.category === 'other') return 1
+        if (b.category === 'other') return -1
+        return b.session_count - a.session_count
+      })
+  }
 
   return (
     <>
@@ -441,25 +444,22 @@ export default function OrgOverview() {
                 <div className="panel-body">
                   {data.task_categories.length === 0 ? (
                     <p className="no-data">No category data yet — run <code>python aiops.py report</code></p>
-                  ) : (
-                    <div className="cat-list">
-                      {normalizeCategories(data.task_categories).map((c: NormalizedCategory, i: number) => {
-                        const hasOthers = c.category === 'other' && !!c.others && c.others.length > 0
-                        return (
+                  ) : (() => {
+                    const MAIN = ['code_generation','testing','configuration','debugging','automation','research']
+                    const normalized = normalizeCategories(data.task_categories)
+                    const mainCats = normalized.filter(c => c.category !== 'other')
+                    const otherEntry = normalized.find(c => c.category === 'other')
+                    const otherSubs = data.task_categories
+                      .filter(c => !MAIN.includes(c.category.toLowerCase().trim()))
+                      .sort((a, b) => b.session_count - a.session_count)
+                    return (
+                      <div className="cat-list">
+                        {mainCats.map((c, i) => (
                           <div className="cat-row" key={c.category}>
                             <div className="cat-meta">
-                              <div
-                                className="cat-label-wrap"
-                                style={{ cursor: hasOthers ? 'pointer' : 'default', userSelect: 'none' }}
-                                onClick={hasOthers ? () => setOthersExpanded(v => !v) : undefined}
-                              >
+                              <div className="cat-label-wrap">
                                 <div className="cat-dot" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />
-                                {c.category}
-                                {hasOthers && (
-                                  <span style={{ fontSize: 9, color: 'var(--gray-500)', marginLeft: 4 }}>
-                                    {othersExpanded ? '▲' : '▼'} ({c.others!.length})
-                                  </span>
-                                )}
+                                {formatCategory(c.category)}
                               </div>
                               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                                 <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>{c.session_count} sessions</span>
@@ -469,21 +469,65 @@ export default function OrgOverview() {
                             <div className="cat-track">
                               <div className="cat-fill" style={{ width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length] }} />
                             </div>
-                            {hasOthers && othersExpanded && (
-                              <div style={{ marginTop: 8, marginLeft: 18, paddingLeft: 10, borderLeft: '1px solid var(--gray-200)' }}>
-                                {c.others!.map(o => (
-                                  <div key={o.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--gray-500)', padding: '2px 0' }}>
-                                    <span>{o.category}</span>
-                                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{o.session_count} sessions</span>
+                          </div>
+                        ))}
+                        {otherEntry && otherSubs.length > 0 && (
+                          <div className="cat-row" key="other">
+                            <div className="cat-meta">
+                              <div className="cat-label-wrap">
+                                <div className="cat-dot" style={{ background: CAT_COLORS[4] }} />
+                                <button
+                                  onClick={() => setOtherExpanded(!otherExpanded)}
+                                  style={{
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    padding: 0, display: 'flex', alignItems: 'center', gap: 4,
+                                    fontSize: 13, color: 'var(--gray-700)', fontWeight: 500,
+                                  }}
+                                >
+                                  Other
+                                  <span style={{
+                                    fontSize: 10, color: 'var(--gray-500)',
+                                    background: 'var(--gray-100)', borderRadius: 4,
+                                    padding: '1px 5px', fontWeight: 600,
+                                  }}>
+                                    {otherSubs.length}
+                                  </span>
+                                  <span style={{ fontSize: 9, color: 'var(--gray-400)' }}>
+                                    {otherExpanded ? '▲' : '▼'}
+                                  </span>
+                                </button>
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>{otherEntry.session_count} sessions</span>
+                                <div className="cat-pct">{otherEntry.pct}%</div>
+                              </div>
+                            </div>
+                            <div className="cat-track">
+                              <div className="cat-fill" style={{ width: `${otherEntry.pct}%`, background: CAT_COLORS[4] }} />
+                            </div>
+                            {otherExpanded && (
+                              <div style={{ marginTop: 8, paddingLeft: 14, borderLeft: '2px solid var(--gray-100)' }}>
+                                {otherSubs.map(sub => (
+                                  <div key={sub.category} style={{ marginBottom: 8 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                                      <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCategory(sub.category)}</span>
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>{sub.session_count} sessions</span>
+                                        <span style={{ fontSize: 11, color: 'var(--gray-500)', fontWeight: 600 }}>{sub.pct}%</span>
+                                      </div>
+                                    </div>
+                                    <div style={{ height: 3, background: 'var(--gray-100)', borderRadius: 2 }}>
+                                      <div style={{ height: '100%', width: `${sub.pct}%`, background: CAT_COLORS[5], borderRadius: 2 }} />
+                                    </div>
                                   </div>
                                 ))}
                               </div>
                             )}
                           </div>
-                        )
-                      })}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
 
