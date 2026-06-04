@@ -140,7 +140,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
     ? data.by_tool_model.reduce((s, r) => s + (r.session_count ?? r.days_active), 0)
     : 0
 
-  // Tool totals — include ALL known tools (0 for absent ones)
+  // Tool totals — only tools with actual data (zero-session tools made blank bars)
   const toolMap = new Map<string, { cost: number; sessions: number }>()
   if (data) {
     for (const row of data.by_tool_model) {
@@ -150,10 +150,11 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
       toolMap.set(row.tool, e)
     }
   }
-  const toolList = [
-    ...ALL_TOOLS.filter(t => toolMap.has(t)).map(t => ({ tool: t, ...toolMap.get(t)! })),
-    ...ALL_TOOLS.filter(t => !toolMap.has(t)).map(t => ({ tool: t, cost: 0, sessions: 0 })),
-  ]
+  const toolList = ALL_TOOLS
+    .filter(t => toolMap.has(t))
+    .map(t => ({ tool: t, ...toolMap.get(t)! }))
+    .filter(t => t.sessions > 0 || t.cost > 0)
+    .sort((a, b) => b.sessions - a.sessions)
   const maxToolSessions = Math.max(...toolList.map(t => t.sessions), 1)
 
   // Model totals
