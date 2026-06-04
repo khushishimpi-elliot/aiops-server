@@ -87,14 +87,31 @@ async def agent_enroll(
         label = body.hostname or body.machine_id
         agent_version = body.os
 
-        device_id: int = await conn.fetchval(
+        # Re-enrolling the same machine must REUSE its device row (rotating
+        # the token), not insert a duplicate — duplicate devices kept their
+        # old usage rows and double-counted everything on the dashboard.
+        device_id: int | None = await conn.fetchval(
             """
-            INSERT INTO devices(user_id, machine_id, label, agent_version, last_seen_at, api_token_hash)
-            VALUES ($1, $2, $3, $4, now(), $5)
+            UPDATE devices
+            SET    api_token_hash = $3, label = $4, agent_version = $5, last_seen_at = now()
+            WHERE  id = (
+                SELECT id FROM devices
+                WHERE  user_id = $1 AND machine_id = $2 AND status = 'active'
+                ORDER  BY id DESC LIMIT 1
+            )
             RETURNING id
             """,
-            user_id, machine_id_hash, label, agent_version, token_hash,
+            user_id, machine_id_hash, token_hash, label, agent_version,
         )
+        if device_id is None:
+            device_id = await conn.fetchval(
+                """
+                INSERT INTO devices(user_id, machine_id, label, agent_version, last_seen_at, api_token_hash)
+                VALUES ($1, $2, $3, $4, now(), $5)
+                RETURNING id
+                """,
+                user_id, machine_id_hash, label, agent_version, token_hash,
+            )
 
         await conn.execute(
             """
@@ -137,16 +154,25 @@ async def agent_sync(
 
     usage_rows: list[tuple] = []
     category_rows: list[tuple] = []
+    usage_ikeys: list[str] = []
+    category_ikeys: list[str] = []
+    payload_dates: set[date_type] = set()
 
     for agg in body.aggregates:
         parsed_date = date_type.fromisoformat(agg.date)
+        payload_dates.add(parsed_date)
         cost_millicents = round(agg.cost_usd * 100_000)
         cache_read = agg.cache_tokens // 2
         cache_write = agg.cache_tokens - cache_read
 
+        # Keyed by device_id, NOT the api token: enrollment rotates the
+        # token, and token-based keys orphaned every prior row on
+        # re-enroll, so the next sync re-inserted the whole history as
+        # duplicates and the dashboard double-counted.
         ikey = hashlib.sha256(
-            f"{token_hash}:{agg.date}:{agg.tool}:{agg.model}:{agg.category or ''}".encode()
+            f"dev{device_id}:{agg.date}:{agg.tool}:{agg.model}:{agg.category or ''}".encode()
         ).hexdigest()[:64]
+        usage_ikeys.append(ikey)
 
         usage_rows.append((
             user_id, device_id, parsed_date,
@@ -158,6 +184,7 @@ async def agent_sync(
 
         if agg.category:
             cat_ikey = hashlib.sha256(f"{ikey}:cat".encode()).hexdigest()[:64]
+            category_ikeys.append(cat_ikey)
             category_rows.append((
                 user_id, device_id, parsed_date,
                 agg.category, agg.sessions, cat_ikey,
@@ -199,6 +226,38 @@ async def agent_sync(
                 """,
                 category_rows,
             )
+
+        # The payload is the authoritative snapshot for every date it covers:
+        # remove rows for THIS MACHINE (any of its device rows — re-enrollment
+        # used to create duplicates) on those dates that the agent no longer
+        # reports. Catches tool renames (claude_code -> claude), category
+        # reclassification, and old token-based idempotency keys, all of which
+        # left stale rows behind that inflated dashboard counts.
+        dates = sorted(payload_dates)
+        await conn.execute(
+            """
+            DELETE FROM usage u
+            USING devices d, devices me
+            WHERE me.id = $1
+              AND d.user_id = me.user_id AND d.machine_id = me.machine_id
+              AND u.device_id = d.id
+              AND u.date = ANY($2::date[])
+              AND u.idempotency_key != ALL($3::text[])
+            """,
+            device_id, dates, usage_ikeys,
+        )
+        await conn.execute(
+            """
+            DELETE FROM usage_categories u
+            USING devices d, devices me
+            WHERE me.id = $1
+              AND d.user_id = me.user_id AND d.machine_id = me.machine_id
+              AND u.device_id = d.id
+              AND u.date = ANY($2::date[])
+              AND u.idempotency_key != ALL($3::text[])
+            """,
+            device_id, dates, category_ikeys,
+        )
 
     stored = len(usage_rows)
 
