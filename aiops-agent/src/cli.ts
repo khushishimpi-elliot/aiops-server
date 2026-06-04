@@ -14,6 +14,8 @@ import { PATHS } from './core/paths.js';
 import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats } from './core/db.js';
 import { saveConfig, getMachineId, isEnrolled, loadConfig as _loadConfig } from './core/config.js';
 import { syncToServer } from './core/syncer.js';
+import { startDaemon, isDaemonAlive, stopDaemon, readDaemonPid, LOG_FILE as DAEMON_LOG } from './core/daemon.js';
+import { install as installAutoStart, uninstall as uninstallAutoStart, isInstalled as isAutoStartInstalled } from './core/installer.js';
 
 const VERSION = '1.0.0';
 
@@ -800,6 +802,18 @@ function cmdStatus(): void {
     console.log(chalk.dim('  Server      ') + chalk.yellow('not enrolled'));
     console.log(chalk.dim('  Run         ') + chalk.white('aiops enroll --server URL --token TOKEN'));
   }
+
+  // Daemon status
+  const daemonRunning  = isDaemonAlive();
+  const autoStartOn    = isAutoStartInstalled();
+  const daemonPid      = readDaemonPid();
+  console.log();
+  console.log(chalk.bold('Daemon        ') + (daemonRunning
+    ? chalk.green(`running  (PID ${daemonPid})`)
+    : chalk.yellow('stopped')));
+  console.log(chalk.bold('Auto-start    ') + (autoStartOn
+    ? chalk.green('enabled')
+    : chalk.yellow('disabled — run: aiops install')));
   console.log();
 }
 
@@ -1442,6 +1456,68 @@ program
     console.log(chalk.dim('  Sent        ') + result.aggregatesSent + ' aggregate rows');
     console.log(chalk.dim('  Days        ') + result.daysIncluded + ' days included');
     console.log(chalk.dim('  No prompts  ') + 'raw text never leaves your machine');
+    console.log();
+  });
+
+// ─── DAEMON COMMAND ──────────────────────────────────────────────────────────
+
+program.command('daemon')
+  .description('Run background sync daemon (normally started automatically by the OS)')
+  .action(async () => {
+    await startDaemon();
+  });
+
+// ─── INSTALL / UNINSTALL ─────────────────────────────────────────────────────
+
+program.command('install')
+  .description('Register daemon to auto-start at login (Mac: launchd | Windows: Task Scheduler | Linux: systemd)')
+  .action(async () => {
+    console.log();
+    divider();
+    console.log(`  ${chalk.bold.cyan('AIOps Install')}  ${chalk.gray('Setting up auto-start...')}`);
+    divider();
+    console.log();
+
+    // Stop any running daemon first so the new registration takes effect cleanly
+    if (isDaemonAlive()) {
+      console.log(chalk.dim('  Stopping existing daemon...'));
+      stopDaemon();
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    const result = installAutoStart();
+    if (result.ok) {
+      console.log(chalk.green(`  ✅ ${result.message}`));
+      console.log();
+      console.log(chalk.dim(`  Method:  ${result.method}`));
+      console.log(chalk.dim(`  Trigger: on login + immediately`));
+      console.log(chalk.dim(`  Sync:    ~2 min after each session ends, plus every 15 min`));
+      console.log(chalk.dim(`  Logs:    ${DAEMON_LOG}`));
+    } else {
+      console.log(chalk.red(`  ✗ ${result.message}`));
+    }
+    console.log();
+    divider();
+    console.log();
+  });
+
+program.command('uninstall')
+  .description('Remove auto-start registration and stop the daemon')
+  .action(async () => {
+    console.log();
+
+    if (isDaemonAlive()) {
+      console.log(chalk.dim('  Stopping daemon...'));
+      stopDaemon();
+      await new Promise(r => setTimeout(r, 800));
+    }
+
+    const result = uninstallAutoStart();
+    if (result.ok) {
+      console.log(chalk.green(`  ✅ ${result.message}`));
+    } else {
+      console.log(chalk.red(`  ✗ ${result.message}`));
+    }
     console.log();
   });
 

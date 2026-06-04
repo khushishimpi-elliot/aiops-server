@@ -157,7 +157,12 @@ async def agent_sync(
                     cost_millicents, idempotency_key
                 )
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-                ON CONFLICT (idempotency_key) DO NOTHING
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    input_tokens       = EXCLUDED.input_tokens,
+                    output_tokens      = EXCLUDED.output_tokens,
+                    cache_read_tokens  = EXCLUDED.cache_read_tokens,
+                    cache_write_tokens = EXCLUDED.cache_write_tokens,
+                    cost_millicents    = EXCLUDED.cost_millicents
                 """,
                 user_id, device_id, parsed_date,
                 agg.tool, agg.model,
@@ -175,7 +180,8 @@ async def agent_sync(
                 """
                 INSERT INTO usage_categories(user_id, device_id, date, category, session_count, idempotency_key)
                 VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (idempotency_key) DO NOTHING
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    session_count = EXCLUDED.session_count
                 """,
                 user_id, device_id, parsed_date,
                 agg.category, agg.sessions, cat_ikey,
