@@ -11,17 +11,11 @@ import { readLastLines, logFilePath } from './core/logger.js';
 import { runAnalysis } from './core/analyst.js';
 import { startServer } from './core/server.js';
 import { PATHS } from './core/paths.js';
-import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats } from './core/db.js';
+import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats, getSessionsSince } from './core/db.js';
 import { saveConfig, getMachineId, isEnrolled, loadConfig as _loadConfig } from './core/config.js';
 import { syncToServer } from './core/syncer.js';
-import { startDaemon, isDaemonAlive, stopDaemon, readDaemonPid, LOG_FILE as DAEMON_LOG } from './core/daemon.js';
-import { install as installAutoStart, uninstall as uninstallAutoStart, isInstalled as isAutoStartInstalled } from './core/installer.js';
 
 const VERSION = '1.0.0';
-
-// Sync window covering the entire local history. Old days are safe to
-// re-send: the server upserts by (date, tool, model, category).
-const FULL_HISTORY_DAYS = 3650;
 
 // ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
 
@@ -806,18 +800,6 @@ function cmdStatus(): void {
     console.log(chalk.dim('  Server      ') + chalk.yellow('not enrolled'));
     console.log(chalk.dim('  Run         ') + chalk.white('aiops enroll --server URL --token TOKEN'));
   }
-
-  // Daemon status
-  const daemonRunning  = isDaemonAlive();
-  const autoStartOn    = isAutoStartInstalled();
-  const daemonPid      = readDaemonPid();
-  console.log();
-  console.log(chalk.bold('Daemon        ') + (daemonRunning
-    ? chalk.green(`running  (PID ${daemonPid})`)
-    : chalk.yellow('stopped')));
-  console.log(chalk.bold('Auto-start    ') + (autoStartOn
-    ? chalk.green('enabled')
-    : chalk.yellow('disabled — run: aiops install')));
   console.log();
 }
 
@@ -1100,10 +1082,7 @@ async function cmdStart(): Promise<void> {
   if (enrolled) {
     try {
       console.log(chalk.white('  Syncing data to company server...'));
-      // Send the FULL local history (not just 28 days) so the server matches
-      // the local session count — the server upserts cumulatively, so
-      // re-sending old days is safe and idempotent.
-      const result = await syncToServer(FULL_HISTORY_DAYS, false);
+      const result = await syncToServer(28, false);
       if (result.success) {
         syncOk = true;
         console.log(chalk.green('  ✅ Data synced to server'));
@@ -1180,42 +1159,6 @@ async function cmdStart(): Promise<void> {
   console.log();
 }
 
-// ─── WATCH COMMAND (continuous scan + sync) ──────────────────────────────────
-
-async function watchTick(): Promise<void> {
-  const ts = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  try {
-    openDb();
-    const liveSessions = runAllAdapters().flatMap(r => r.sessions);
-    if (liveSessions.length) upsertSessions(liveSessions);
-    const total = dbAvailable() ? getDbStats().totalRows : liveSessions.length;
-
-    if (isEnrolled()) {
-      const result = await syncToServer(FULL_HISTORY_DAYS, false);
-      if (result.success) {
-        console.log(chalk.gray(`  [${ts}] `) + chalk.green('✓') + chalk.white(` ${total} sessions — synced ${result.aggregatesSent} aggregates (${result.daysIncluded} days)`));
-      } else {
-        console.log(chalk.gray(`  [${ts}] `) + chalk.yellow('⚠') + chalk.white(` ${total} sessions — sync failed: ${result.error ?? 'unknown'}`));
-      }
-    } else {
-      console.log(chalk.gray(`  [${ts}] `) + chalk.white(`${total} sessions saved locally`) + chalk.dim(' (not enrolled — no sync)'));
-    }
-  } catch (err) {
-    console.log(chalk.gray(`  [${ts}] `) + chalk.yellow('⚠ tick failed: ' + (err as Error).message));
-  }
-}
-
-async function cmdWatch(opts: { interval?: string }): Promise<void> {
-  const minutes = Math.max(1, parseInt(opts.interval ?? '5') || 5);
-  console.log();
-  console.log(`  ${chalk.bold.cyan('AIOps Watch')}  ${chalk.gray('v' + VERSION)}`);
-  console.log(chalk.dim(`  Scanning + syncing every ${minutes} min. Press Ctrl+C to stop.`));
-  console.log();
-
-  await watchTick();
-  setInterval(() => { void watchTick(); }, minutes * 60_000);
-}
-
 // ─── CLI SETUP ────────────────────────────────────────────────────────────────
 
 program.name('aiops').version(VERSION).description('Monitor AI coding tool usage and costs');
@@ -1223,11 +1166,6 @@ program.name('aiops').version(VERSION).description('Monitor AI coding tool usage
 program.command('start')
   .description('Scan, save and sync everything (recommended)')
   .action(() => cmdStart());
-
-program.command('watch')
-  .description('Keep scanning and syncing to the server continuously (real-time mode)')
-  .option('-i, --interval <minutes>', 'minutes between scans', '5')
-  .action((opts: { interval?: string }) => cmdWatch(opts));
 
 program.command('scan')
   .description('Scan AI tools on this machine')
@@ -1445,7 +1383,7 @@ program
 program
   .command('sync')
   .description('Send data to company server')
-  .option('--days <n>', 'How many days of data to send (default: full history)', String(FULL_HISTORY_DAYS))
+  .option('--days <n>', 'How many days of data to send')
   .option('--dry-run', 'Preview what would be sent without sending')
   .action(async (opts: { days?: string; dryRun?: boolean }) => {
     if (!isEnrolled()) {
@@ -1454,7 +1392,6 @@ program
       return;
     }
 
-    const days   = parseInt(opts.days ?? String(FULL_HISTORY_DAYS)) || FULL_HISTORY_DAYS;
     const dryRun = !!opts.dryRun;
 
     // Refresh the local DB with the latest live session data so sync is
@@ -1462,6 +1399,20 @@ program
     openDb();
     const liveSessions = runAllAdapters().flatMap(r => r.sessions);
     if (liveSessions.length) upsertSessions(liveSessions);
+
+    // Default: sync from the very first session ever recorded so nothing is missed.
+    let days: number;
+    if (opts.days) {
+      days = parseInt(opts.days) || 30;
+    } else {
+      const allSessions = getSessionsSince(3650);
+      if (allSessions.length > 0) {
+        const oldest = allSessions[allSessions.length - 1];
+        days = Math.ceil((Date.now() - (oldest.sessionTimestamp || Date.now())) / 86400000) + 1;
+      } else {
+        days = 30;
+      }
+    }
 
     if (dryRun) {
       console.log(chalk.bold('\n  DRY RUN — nothing will be sent\n'));
@@ -1507,65 +1458,66 @@ program
     console.log();
   });
 
-// ─── DAEMON COMMAND ──────────────────────────────────────────────────────────
-
-program.command('daemon')
-  .description('Run background sync daemon (normally started automatically by the OS)')
-  .action(async () => {
-    await startDaemon();
-  });
-
-// ─── INSTALL / UNINSTALL ─────────────────────────────────────────────────────
-
+// ── install command ───────────────────────────────────────────────────────────
 program.command('install')
-  .description('Register daemon to auto-start at login (Mac: launchd | Windows: Task Scheduler | Linux: systemd)')
-  .action(async () => {
+  .description('Register AIOps Agent to auto-start on login')
+  .action(() => {
+    const { execSync } = require('child_process');
+    const HOME = os.homedir();
+    const aiopsDir = path.join(HOME, '.aiops');
+    const vbsPath  = path.join(aiopsDir, 'start-daemon.vbs');
+
     console.log();
-    divider();
-    console.log(`  ${chalk.bold.cyan('AIOps Install')}  ${chalk.gray('Setting up auto-start...')}`);
-    divider();
+    console.log(chalk.cyan('─────────────────────────────────────────────────────'));
+    console.log(chalk.cyan('  AIOps Install') + '  Setting up auto-start...');
+    console.log(chalk.cyan('─────────────────────────────────────────────────────'));
     console.log();
 
-    // Stop any running daemon first so the new registration takes effect cleanly
-    if (isDaemonAlive()) {
-      console.log(chalk.dim('  Stopping existing daemon...'));
-      stopDaemon();
-      await new Promise(r => setTimeout(r, 800));
+    // Ensure .aiops dir exists
+    if (!fs.existsSync(aiopsDir)) fs.mkdirSync(aiopsDir, { recursive: true });
+
+    // Write the VBS launcher
+    const aiopsExe = process.platform === 'win32'
+      ? String(execSync('where aiops', { encoding: 'utf8' }).trim().split('\n')[0]).trim()
+      : 'aiops';
+
+    const vbsContent = [
+      'Set WshShell = CreateObject("WScript.Shell")',
+      `WshShell.Run "cmd /c aiops start >> ""${path.join(aiopsDir, 'daemon.log')}"" 2>&1", 0, False`,
+    ].join('\r\n');
+    fs.writeFileSync(vbsPath, vbsContent, 'utf8');
+
+    if (process.platform !== 'win32') {
+      // macOS / Linux: use launchd / cron fallback
+      console.log(chalk.yellow('  Non-Windows platform — skipping Task Scheduler.'));
+      console.log(chalk.green('  ✔ VBS written (not applicable on this OS).'));
+      return;
     }
 
-    const result = installAutoStart();
-    if (result.ok) {
-      console.log(chalk.green(`  ✅ ${result.message}`));
-      console.log();
-      console.log(chalk.dim(`  Method:  ${result.method}`));
-      console.log(chalk.dim(`  Trigger: on login + immediately`));
-      console.log(chalk.dim(`  Sync:    ~2 min after each session ends, plus every 15 min`));
-      console.log(chalk.dim(`  Logs:    ${DAEMON_LOG}`));
-    } else {
-      console.log(chalk.red(`  ✗ ${result.message}`));
-    }
-    console.log();
-    divider();
-    console.log();
-  });
+    const taskCmd = `schtasks /create /f /tn "AIOps Agent" /tr "wscript.exe \\"${vbsPath}\\"" /sc onlogon /rl limited /delay 0000:30`;
 
-program.command('uninstall')
-  .description('Remove auto-start registration and stop the daemon')
-  .action(async () => {
-    console.log();
-
-    if (isDaemonAlive()) {
-      console.log(chalk.dim('  Stopping daemon...'));
-      stopDaemon();
-      await new Promise(r => setTimeout(r, 800));
+    let usedRegistry = false;
+    try {
+      execSync(taskCmd, { stdio: 'pipe' });
+      console.log(chalk.green('  ✔ Registered in Task Scheduler ("AIOps Agent")'));
+    } catch {
+      // Task Scheduler blocked (no admin) — fall back to Registry Run key
+      try {
+        const regCmd = `reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "AIOps Agent" /t REG_SZ /d "wscript.exe \\"${vbsPath}\\"" /f`;
+        execSync(regCmd, { stdio: 'pipe' });
+        usedRegistry = true;
+        console.log(chalk.green('  ✔ Registered in Registry Run key (auto-starts on login)'));
+      } catch (regErr) {
+        console.log(chalk.red('  ✗ Install failed: ' + String(regErr)));
+        process.exit(1);
+      }
     }
 
-    const result = uninstallAutoStart();
-    if (result.ok) {
-      console.log(chalk.green(`  ✅ ${result.message}`));
-    } else {
-      console.log(chalk.red(`  ✗ ${result.message}`));
-    }
+    console.log();
+    console.log(chalk.cyan('─────────────────────────────────────────────────────'));
+    console.log();
+    console.log('  ' + chalk.green('✔') + ' Auto-start enabled' + (usedRegistry ? chalk.dim(' (via Registry)') : chalk.dim(' (via Task Scheduler)')));
+    console.log('  ' + chalk.dim('Run') + ' ' + chalk.white('aiops start') + chalk.dim(' now to sync immediately.'));
     console.log();
   });
 

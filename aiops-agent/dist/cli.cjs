@@ -959,8 +959,8 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path15 = require("node:path");
-    var fs18 = require("node:fs");
+    var path13 = require("node:path");
+    var fs16 = require("node:fs");
     var process3 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1892,11 +1892,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path15.resolve(baseDir, baseName);
-          if (fs18.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path15.extname(baseName))) return void 0;
+          const localBin = path13.resolve(baseDir, baseName);
+          if (fs16.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path13.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs18.existsSync(`${localBin}${ext}`)
+            (ext) => fs16.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1908,21 +1908,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs18.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs16.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path15.resolve(
-            path15.dirname(resolvedScriptPath),
+          executableDir = path13.resolve(
+            path13.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path15.basename(
+            const legacyName = path13.basename(
               this._scriptPath,
-              path15.extname(this._scriptPath)
+              path13.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1933,7 +1933,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path15.extname(executableFile));
+        launchWithNode = sourceExt.includes(path13.extname(executableFile));
         let proc;
         if (process3.platform !== "win32") {
           if (launchWithNode) {
@@ -2773,7 +2773,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path15.basename(filename, path15.extname(filename));
+        this._name = path13.basename(filename, path13.extname(filename));
         return this;
       }
       /**
@@ -2787,9 +2787,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path16) {
-        if (path16 === void 0) return this._executableDir;
-        this._executableDir = path16;
+      executableDir(path14) {
+        if (path14 === void 0) return this._executableDir;
+        this._executableDir = path14;
         return this;
       }
       /**
@@ -3536,7 +3536,7 @@ var require_has_flag = __commonJS({
 var require_supports_colors = __commonJS({
   "node_modules/@colors/colors/lib/system/supports-colors.js"(exports2, module2) {
     "use strict";
-    var os10 = require("os");
+    var os8 = require("os");
     var hasFlag2 = require_has_flag();
     var env2 = process.env;
     var forceColor = void 0;
@@ -3574,7 +3574,7 @@ var require_supports_colors = __commonJS({
       }
       var min = forceColor ? 1 : 0;
       if (process.platform === "win32") {
-        var osRelease = os10.release().split(".");
+        var osRelease = os8.release().split(".");
         if (Number(process.versions.node.split(".")[0]) >= 8 && Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
           return Number(osRelease[2]) >= 14931 ? 3 : 2;
         }
@@ -4828,7 +4828,7 @@ var require_cli_table3 = __commonJS({
 var require_constants = __commonJS({
   "node_modules/picomatch/lib/constants.js"(exports2, module2) {
     "use strict";
-    var path15 = require("path");
+    var path13 = require("path");
     var WIN_SLASH = "\\\\/";
     var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
     var DEFAULT_MAX_EXTGLOB_RECURSION = 0;
@@ -5002,7 +5002,7 @@ var require_constants = __commonJS({
       /* | */
       CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
       /* \uFEFF */
-      SEP: path15.sep,
+      SEP: path13.sep,
       /**
        * Create EXTGLOB_CHARS
        */
@@ -5029,7 +5029,7 @@ var require_constants = __commonJS({
 var require_utils2 = __commonJS({
   "node_modules/picomatch/lib/utils.js"(exports2) {
     "use strict";
-    var path15 = require("path");
+    var path13 = require("path");
     var win32 = process.platform === "win32";
     var {
       REGEX_BACKSLASH,
@@ -5058,7 +5058,7 @@ var require_utils2 = __commonJS({
       if (options && typeof options.windows === "boolean") {
         return options.windows;
       }
-      return win32 === true || path15.sep === "\\";
+      return win32 === true || path13.sep === "\\";
     };
     exports2.escapeLast = (input, char, lastIdx) => {
       const idx = input.lastIndexOf(char, lastIdx);
@@ -6422,7 +6422,7 @@ var require_parse = __commonJS({
 var require_picomatch = __commonJS({
   "node_modules/picomatch/lib/picomatch.js"(exports2, module2) {
     "use strict";
-    var path15 = require("path");
+    var path13 = require("path");
     var scan = require_scan();
     var parse = require_parse();
     var utils = require_utils2();
@@ -6507,7 +6507,7 @@ var require_picomatch = __commonJS({
     };
     picomatch.matchBase = (input, glob, options, posix = utils.isWindows(options)) => {
       const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
-      return regex.test(path15.basename(input));
+      return regex.test(path13.basename(input));
     };
     picomatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
     picomatch.parse = (pattern, options) => {
@@ -6571,15 +6571,15 @@ var require_picomatch2 = __commonJS({
 var require_readdirp = __commonJS({
   "node_modules/readdirp/index.js"(exports2, module2) {
     "use strict";
-    var fs18 = require("fs");
+    var fs16 = require("fs");
     var { Readable } = require("stream");
     var sysPath = require("path");
     var { promisify } = require("util");
     var picomatch = require_picomatch2();
-    var readdir = promisify(fs18.readdir);
-    var stat = promisify(fs18.stat);
-    var lstat = promisify(fs18.lstat);
-    var realpath = promisify(fs18.realpath);
+    var readdir = promisify(fs16.readdir);
+    var stat = promisify(fs16.stat);
+    var lstat = promisify(fs16.lstat);
+    var realpath = promisify(fs16.realpath);
     var BANG = "!";
     var RECURSIVE_ERROR_CODE = "READDIRP_RECURSIVE_ERROR";
     var NORMAL_FLOW_ERRORS = /* @__PURE__ */ new Set(["ENOENT", "EPERM", "EACCES", "ELOOP", RECURSIVE_ERROR_CODE]);
@@ -6623,8 +6623,8 @@ var require_readdirp = __commonJS({
         return {
           root: ".",
           /* eslint-disable no-unused-vars */
-          fileFilter: (path15) => true,
-          directoryFilter: (path15) => true,
+          fileFilter: (path13) => true,
+          directoryFilter: (path13) => true,
           /* eslint-enable no-unused-vars */
           type: FILE_TYPE,
           lstat: false,
@@ -6644,7 +6644,7 @@ var require_readdirp = __commonJS({
         this._directoryFilter = normalizeFilter(opts.directoryFilter);
         const statMethod = opts.lstat ? lstat : stat;
         if (wantBigintFsStats) {
-          this._stat = (path15) => statMethod(path15, { bigint: true });
+          this._stat = (path13) => statMethod(path13, { bigint: true });
         } else {
           this._stat = statMethod;
         }
@@ -6653,7 +6653,7 @@ var require_readdirp = __commonJS({
         this._wantsFile = [FILE_TYPE, FILE_DIR_TYPE, EVERYTHING_TYPE].includes(type);
         this._wantsEverything = type === EVERYTHING_TYPE;
         this._root = sysPath.resolve(root);
-        this._isDirent = "Dirent" in fs18 && !opts.alwaysStat;
+        this._isDirent = "Dirent" in fs16 && !opts.alwaysStat;
         this._statsProp = this._isDirent ? "dirent" : "stats";
         this._rdOptions = { encoding: "utf8", withFileTypes: this._isDirent };
         this.parents = [this._exploreDir(root, 1)];
@@ -6665,9 +6665,9 @@ var require_readdirp = __commonJS({
         this.reading = true;
         try {
           while (!this.destroyed && batch > 0) {
-            const { path: path15, depth, files = [] } = this.parent || {};
+            const { path: path13, depth, files = [] } = this.parent || {};
             if (files.length > 0) {
-              const slice = files.splice(0, batch).map((dirent) => this._formatEntry(dirent, path15));
+              const slice = files.splice(0, batch).map((dirent) => this._formatEntry(dirent, path13));
               for (const entry of await Promise.all(slice)) {
                 if (this.destroyed) return;
                 const entryType = await this._getEntryType(entry);
@@ -6702,20 +6702,20 @@ var require_readdirp = __commonJS({
           this.reading = false;
         }
       }
-      async _exploreDir(path15, depth) {
+      async _exploreDir(path13, depth) {
         let files;
         try {
-          files = await readdir(path15, this._rdOptions);
+          files = await readdir(path13, this._rdOptions);
         } catch (error) {
           this._onError(error);
         }
-        return { files, depth, path: path15 };
+        return { files, depth, path: path13 };
       }
-      async _formatEntry(dirent, path15) {
+      async _formatEntry(dirent, path13) {
         let entry;
         try {
           const basename = this._isDirent ? dirent.name : dirent;
-          const fullPath = sysPath.resolve(sysPath.join(path15, basename));
+          const fullPath = sysPath.resolve(sysPath.join(path13, basename));
           entry = { path: sysPath.relative(this._root, fullPath), fullPath, basename };
           entry[this._statsProp] = this._isDirent ? dirent : await this._stat(fullPath);
         } catch (err) {
@@ -6800,22 +6800,22 @@ var require_readdirp = __commonJS({
 // node_modules/normalize-path/index.js
 var require_normalize_path = __commonJS({
   "node_modules/normalize-path/index.js"(exports2, module2) {
-    module2.exports = function(path15, stripTrailing) {
-      if (typeof path15 !== "string") {
+    module2.exports = function(path13, stripTrailing) {
+      if (typeof path13 !== "string") {
         throw new TypeError("expected path to be a string");
       }
-      if (path15 === "\\" || path15 === "/") return "/";
-      var len = path15.length;
-      if (len <= 1) return path15;
+      if (path13 === "\\" || path13 === "/") return "/";
+      var len = path13.length;
+      if (len <= 1) return path13;
       var prefix = "";
-      if (len > 4 && path15[3] === "\\") {
-        var ch = path15[2];
-        if ((ch === "?" || ch === ".") && path15.slice(0, 2) === "\\\\") {
-          path15 = path15.slice(2);
+      if (len > 4 && path13[3] === "\\") {
+        var ch = path13[2];
+        if ((ch === "?" || ch === ".") && path13.slice(0, 2) === "\\\\") {
+          path13 = path13.slice(2);
           prefix = "//";
         }
       }
-      var segs = path15.split(/[/\\]+/);
+      var segs = path13.split(/[/\\]+/);
       if (stripTrailing !== false && segs[segs.length - 1] === "") {
         segs.pop();
       }
@@ -6853,17 +6853,17 @@ var require_anymatch = __commonJS({
       if (!isList && typeof _path !== "string") {
         throw new TypeError("anymatch: second argument must be a string: got " + Object.prototype.toString.call(_path));
       }
-      const path15 = normalizePath(_path, false);
+      const path13 = normalizePath(_path, false);
       for (let index = 0; index < negPatterns.length; index++) {
         const nglob = negPatterns[index];
-        if (nglob(path15)) {
+        if (nglob(path13)) {
           return returnIndex ? -1 : false;
         }
       }
-      const applied = isList && [path15].concat(args.slice(1));
+      const applied = isList && [path13].concat(args.slice(1));
       for (let index = 0; index < patterns.length; index++) {
         const pattern = patterns[index];
-        if (isList ? pattern(...applied) : pattern(path15)) {
+        if (isList ? pattern(...applied) : pattern(path13)) {
           return returnIndex ? index : true;
         }
       }
@@ -8430,10 +8430,10 @@ var require_binary_extensions2 = __commonJS({
 var require_is_binary_path = __commonJS({
   "node_modules/is-binary-path/index.js"(exports2, module2) {
     "use strict";
-    var path15 = require("path");
+    var path13 = require("path");
     var binaryExtensions = require_binary_extensions2();
     var extensions = new Set(binaryExtensions);
-    module2.exports = (filePath) => extensions.has(path15.extname(filePath).slice(1).toLowerCase());
+    module2.exports = (filePath) => extensions.has(path13.extname(filePath).slice(1).toLowerCase());
   }
 });
 
@@ -8443,7 +8443,7 @@ var require_constants3 = __commonJS({
     "use strict";
     var { sep } = require("path");
     var { platform } = process;
-    var os10 = require("os");
+    var os8 = require("os");
     exports2.EV_ALL = "all";
     exports2.EV_READY = "ready";
     exports2.EV_ADD = "add";
@@ -8497,7 +8497,7 @@ var require_constants3 = __commonJS({
     exports2.isWindows = platform === "win32";
     exports2.isMacos = platform === "darwin";
     exports2.isLinux = platform === "linux";
-    exports2.isIBMi = os10.type() === "OS400";
+    exports2.isIBMi = os8.type() === "OS400";
   }
 });
 
@@ -8505,7 +8505,7 @@ var require_constants3 = __commonJS({
 var require_nodefs_handler = __commonJS({
   "node_modules/chokidar/lib/nodefs-handler.js"(exports2, module2) {
     "use strict";
-    var fs18 = require("fs");
+    var fs16 = require("fs");
     var sysPath = require("path");
     var { promisify } = require("util");
     var isBinaryPath = require_is_binary_path();
@@ -8528,11 +8528,11 @@ var require_nodefs_handler = __commonJS({
       STAR
     } = require_constants3();
     var THROTTLE_MODE_WATCH = "watch";
-    var open = promisify(fs18.open);
-    var stat = promisify(fs18.stat);
-    var lstat = promisify(fs18.lstat);
-    var close = promisify(fs18.close);
-    var fsrealpath = promisify(fs18.realpath);
+    var open = promisify(fs16.open);
+    var stat = promisify(fs16.stat);
+    var lstat = promisify(fs16.lstat);
+    var close = promisify(fs16.close);
+    var fsrealpath = promisify(fs16.realpath);
     var statMethods = { lstat, stat };
     var foreach = (val, fn) => {
       if (val instanceof Set) {
@@ -8566,20 +8566,20 @@ var require_nodefs_handler = __commonJS({
     };
     var isEmptySet = (val) => val instanceof Set ? val.size === 0 : !val;
     var FsWatchInstances = /* @__PURE__ */ new Map();
-    function createFsWatchInstance(path15, options, listener, errHandler, emitRaw) {
+    function createFsWatchInstance(path13, options, listener, errHandler, emitRaw) {
       const handleEvent = (rawEvent, evPath) => {
-        listener(path15);
-        emitRaw(rawEvent, evPath, { watchedPath: path15 });
-        if (evPath && path15 !== evPath) {
+        listener(path13);
+        emitRaw(rawEvent, evPath, { watchedPath: path13 });
+        if (evPath && path13 !== evPath) {
           fsWatchBroadcast(
-            sysPath.resolve(path15, evPath),
+            sysPath.resolve(path13, evPath),
             KEY_LISTENERS,
-            sysPath.join(path15, evPath)
+            sysPath.join(path13, evPath)
           );
         }
       };
       try {
-        return fs18.watch(path15, options, handleEvent);
+        return fs16.watch(path13, options, handleEvent);
       } catch (error) {
         errHandler(error);
       }
@@ -8591,13 +8591,13 @@ var require_nodefs_handler = __commonJS({
         listener(val1, val2, val3);
       });
     };
-    var setFsWatchListener = (path15, fullPath, options, handlers) => {
+    var setFsWatchListener = (path13, fullPath, options, handlers) => {
       const { listener, errHandler, rawEmitter } = handlers;
       let cont = FsWatchInstances.get(fullPath);
       let watcher;
       if (!options.persistent) {
         watcher = createFsWatchInstance(
-          path15,
+          path13,
           options,
           listener,
           errHandler,
@@ -8611,7 +8611,7 @@ var require_nodefs_handler = __commonJS({
         addAndConvert(cont, KEY_RAW, rawEmitter);
       } else {
         watcher = createFsWatchInstance(
-          path15,
+          path13,
           options,
           fsWatchBroadcast.bind(null, fullPath, KEY_LISTENERS),
           errHandler,
@@ -8624,7 +8624,7 @@ var require_nodefs_handler = __commonJS({
           cont.watcherUnusable = true;
           if (isWindows && error.code === "EPERM") {
             try {
-              const fd = await open(path15, "r");
+              const fd = await open(path13, "r");
               await close(fd);
               broadcastErr(error);
             } catch (err) {
@@ -8655,7 +8655,7 @@ var require_nodefs_handler = __commonJS({
       };
     };
     var FsWatchFileInstances = /* @__PURE__ */ new Map();
-    var setFsWatchFileListener = (path15, fullPath, options, handlers) => {
+    var setFsWatchFileListener = (path13, fullPath, options, handlers) => {
       const { listener, rawEmitter } = handlers;
       let cont = FsWatchFileInstances.get(fullPath);
       let listeners = /* @__PURE__ */ new Set();
@@ -8664,7 +8664,7 @@ var require_nodefs_handler = __commonJS({
       if (copts && (copts.persistent < options.persistent || copts.interval > options.interval)) {
         listeners = cont.listeners;
         rawEmitters = cont.rawEmitters;
-        fs18.unwatchFile(fullPath);
+        fs16.unwatchFile(fullPath);
         cont = void 0;
       }
       if (cont) {
@@ -8675,13 +8675,13 @@ var require_nodefs_handler = __commonJS({
           listeners: listener,
           rawEmitters: rawEmitter,
           options,
-          watcher: fs18.watchFile(fullPath, options, (curr, prev) => {
+          watcher: fs16.watchFile(fullPath, options, (curr, prev) => {
             foreach(cont.rawEmitters, (rawEmitter2) => {
               rawEmitter2(EV_CHANGE, fullPath, { curr, prev });
             });
             const currmtime = curr.mtimeMs;
             if (curr.size !== prev.size || currmtime > prev.mtimeMs || currmtime === 0) {
-              foreach(cont.listeners, (listener2) => listener2(path15, curr));
+              foreach(cont.listeners, (listener2) => listener2(path13, curr));
             }
           })
         };
@@ -8692,7 +8692,7 @@ var require_nodefs_handler = __commonJS({
         delFromSet(cont, KEY_RAW, rawEmitter);
         if (isEmptySet(cont.listeners)) {
           FsWatchFileInstances.delete(fullPath);
-          fs18.unwatchFile(fullPath);
+          fs16.unwatchFile(fullPath);
           cont.options = cont.watcher = void 0;
           Object.freeze(cont);
         }
@@ -8712,24 +8712,24 @@ var require_nodefs_handler = __commonJS({
        * @param {Function} listener on fs change
        * @returns {Function} closer for the watcher instance
        */
-      _watchWithNodeFs(path15, listener) {
+      _watchWithNodeFs(path13, listener) {
         const opts = this.fsw.options;
-        const directory = sysPath.dirname(path15);
-        const basename = sysPath.basename(path15);
+        const directory = sysPath.dirname(path13);
+        const basename = sysPath.basename(path13);
         const parent = this.fsw._getWatchedDir(directory);
         parent.add(basename);
-        const absolutePath = sysPath.resolve(path15);
+        const absolutePath = sysPath.resolve(path13);
         const options = { persistent: opts.persistent };
         if (!listener) listener = EMPTY_FN;
         let closer;
         if (opts.usePolling) {
           options.interval = opts.enableBinaryInterval && isBinaryPath(basename) ? opts.binaryInterval : opts.interval;
-          closer = setFsWatchFileListener(path15, absolutePath, options, {
+          closer = setFsWatchFileListener(path13, absolutePath, options, {
             listener,
             rawEmitter: this.fsw._emitRaw
           });
         } else {
-          closer = setFsWatchListener(path15, absolutePath, options, {
+          closer = setFsWatchListener(path13, absolutePath, options, {
             listener,
             errHandler: this._boundHandleError,
             rawEmitter: this.fsw._emitRaw
@@ -8753,7 +8753,7 @@ var require_nodefs_handler = __commonJS({
         const parent = this.fsw._getWatchedDir(dirname);
         let prevStats = stats;
         if (parent.has(basename)) return;
-        const listener = async (path15, newStats) => {
+        const listener = async (path13, newStats) => {
           if (!this.fsw._throttle(THROTTLE_MODE_WATCH, file, 5)) return;
           if (!newStats || newStats.mtimeMs === 0) {
             try {
@@ -8765,9 +8765,9 @@ var require_nodefs_handler = __commonJS({
                 this.fsw._emit(EV_CHANGE, file, newStats2);
               }
               if (isLinux && prevStats.ino !== newStats2.ino) {
-                this.fsw._closeFile(path15);
+                this.fsw._closeFile(path13);
                 prevStats = newStats2;
-                this.fsw._addPathCloser(path15, this._watchWithNodeFs(file, listener));
+                this.fsw._addPathCloser(path13, this._watchWithNodeFs(file, listener));
               } else {
                 prevStats = newStats2;
               }
@@ -8798,7 +8798,7 @@ var require_nodefs_handler = __commonJS({
        * @param {String} item basename of this item
        * @returns {Promise<Boolean>} true if no more processing is needed for this entry.
        */
-      async _handleSymlink(entry, directory, path15, item) {
+      async _handleSymlink(entry, directory, path13, item) {
         if (this.fsw.closed) {
           return;
         }
@@ -8808,7 +8808,7 @@ var require_nodefs_handler = __commonJS({
           this.fsw._incrReadyCount();
           let linkPath;
           try {
-            linkPath = await fsrealpath(path15);
+            linkPath = await fsrealpath(path13);
           } catch (e) {
             this.fsw._emitReady();
             return true;
@@ -8817,12 +8817,12 @@ var require_nodefs_handler = __commonJS({
           if (dir.has(item)) {
             if (this.fsw._symlinkPaths.get(full) !== linkPath) {
               this.fsw._symlinkPaths.set(full, linkPath);
-              this.fsw._emit(EV_CHANGE, path15, entry.stats);
+              this.fsw._emit(EV_CHANGE, path13, entry.stats);
             }
           } else {
             dir.add(item);
             this.fsw._symlinkPaths.set(full, linkPath);
-            this.fsw._emit(EV_ADD, path15, entry.stats);
+            this.fsw._emit(EV_ADD, path13, entry.stats);
           }
           this.fsw._emitReady();
           return true;
@@ -8850,9 +8850,9 @@ var require_nodefs_handler = __commonJS({
             return;
           }
           const item = entry.path;
-          let path15 = sysPath.join(directory, item);
+          let path13 = sysPath.join(directory, item);
           current.add(item);
-          if (entry.stats.isSymbolicLink() && await this._handleSymlink(entry, directory, path15, item)) {
+          if (entry.stats.isSymbolicLink() && await this._handleSymlink(entry, directory, path13, item)) {
             return;
           }
           if (this.fsw.closed) {
@@ -8861,8 +8861,8 @@ var require_nodefs_handler = __commonJS({
           }
           if (item === target || !target && !previous.has(item)) {
             this.fsw._incrReadyCount();
-            path15 = sysPath.join(dir, sysPath.relative(dir, path15));
-            this._addToNodeFs(path15, initialAdd, wh, depth + 1);
+            path13 = sysPath.join(dir, sysPath.relative(dir, path13));
+            this._addToNodeFs(path13, initialAdd, wh, depth + 1);
           }
         }).on(EV_ERROR, this._boundHandleError);
         return new Promise(
@@ -8932,13 +8932,13 @@ var require_nodefs_handler = __commonJS({
        * @param {String=} target Child path actually targeted for watch
        * @returns {Promise}
        */
-      async _addToNodeFs(path15, initialAdd, priorWh, depth, target) {
+      async _addToNodeFs(path13, initialAdd, priorWh, depth, target) {
         const ready = this.fsw._emitReady;
-        if (this.fsw._isIgnored(path15) || this.fsw.closed) {
+        if (this.fsw._isIgnored(path13) || this.fsw.closed) {
           ready();
           return false;
         }
-        const wh = this.fsw._getWatchHelpers(path15, depth);
+        const wh = this.fsw._getWatchHelpers(path13, depth);
         if (!wh.hasGlob && priorWh) {
           wh.hasGlob = priorWh.hasGlob;
           wh.globFilter = priorWh.globFilter;
@@ -8952,11 +8952,11 @@ var require_nodefs_handler = __commonJS({
             ready();
             return false;
           }
-          const follow = this.fsw.options.followSymlinks && !path15.includes(STAR) && !path15.includes(BRACE_START);
+          const follow = this.fsw.options.followSymlinks && !path13.includes(STAR) && !path13.includes(BRACE_START);
           let closer;
           if (stats.isDirectory()) {
-            const absPath = sysPath.resolve(path15);
-            const targetPath = follow ? await fsrealpath(path15) : path15;
+            const absPath = sysPath.resolve(path13);
+            const targetPath = follow ? await fsrealpath(path13) : path13;
             if (this.fsw.closed) return;
             closer = await this._handleDir(wh.watchPath, stats, initialAdd, depth, target, wh, targetPath);
             if (this.fsw.closed) return;
@@ -8964,26 +8964,26 @@ var require_nodefs_handler = __commonJS({
               this.fsw._symlinkPaths.set(absPath, targetPath);
             }
           } else if (stats.isSymbolicLink()) {
-            const targetPath = follow ? await fsrealpath(path15) : path15;
+            const targetPath = follow ? await fsrealpath(path13) : path13;
             if (this.fsw.closed) return;
             const parent = sysPath.dirname(wh.watchPath);
             this.fsw._getWatchedDir(parent).add(wh.watchPath);
             this.fsw._emit(EV_ADD, wh.watchPath, stats);
-            closer = await this._handleDir(parent, stats, initialAdd, depth, path15, wh, targetPath);
+            closer = await this._handleDir(parent, stats, initialAdd, depth, path13, wh, targetPath);
             if (this.fsw.closed) return;
             if (targetPath !== void 0) {
-              this.fsw._symlinkPaths.set(sysPath.resolve(path15), targetPath);
+              this.fsw._symlinkPaths.set(sysPath.resolve(path13), targetPath);
             }
           } else {
             closer = this._handleFile(wh.watchPath, stats, initialAdd);
           }
           ready();
-          this.fsw._addPathCloser(path15, closer);
+          this.fsw._addPathCloser(path13, closer);
           return false;
         } catch (error) {
           if (this.fsw._handleError(error)) {
             ready();
-            return path15;
+            return path13;
           }
         }
       }
@@ -8996,7 +8996,7 @@ var require_nodefs_handler = __commonJS({
 var require_fsevents_handler = __commonJS({
   "node_modules/chokidar/lib/fsevents-handler.js"(exports2, module2) {
     "use strict";
-    var fs18 = require("fs");
+    var fs16 = require("fs");
     var sysPath = require("path");
     var { promisify } = require("util");
     var fsevents;
@@ -9041,9 +9041,9 @@ var require_fsevents_handler = __commonJS({
       IDENTITY_FN
     } = require_constants3();
     var Depth = (value) => isNaN(value) ? {} : { depth: value };
-    var stat = promisify(fs18.stat);
-    var lstat = promisify(fs18.lstat);
-    var realpath = promisify(fs18.realpath);
+    var stat = promisify(fs16.stat);
+    var lstat = promisify(fs16.lstat);
+    var realpath = promisify(fs16.realpath);
     var statMethods = { stat, lstat };
     var FSEventsWatchers = /* @__PURE__ */ new Map();
     var consolidateThreshhold = 10;
@@ -9057,18 +9057,18 @@ var require_fsevents_handler = __commonJS({
       131840,
       262912
     ]);
-    var createFSEventsInstance = (path15, callback) => {
-      const stop = fsevents.watch(path15, callback);
+    var createFSEventsInstance = (path13, callback) => {
+      const stop = fsevents.watch(path13, callback);
       return { stop };
     };
-    function setFSEventsListener(path15, realPath, listener, rawEmitter) {
+    function setFSEventsListener(path13, realPath, listener, rawEmitter) {
       let watchPath = sysPath.extname(realPath) ? sysPath.dirname(realPath) : realPath;
       const parentPath = sysPath.dirname(watchPath);
       let cont = FSEventsWatchers.get(watchPath);
       if (couldConsolidate(parentPath)) {
         watchPath = parentPath;
       }
-      const resolvedPath = sysPath.resolve(path15);
+      const resolvedPath = sysPath.resolve(path13);
       const hasSymlink = resolvedPath !== realPath;
       const filteredListener = (fullPath, flags, info) => {
         if (hasSymlink) fullPath = fullPath.replace(realPath, resolvedPath);
@@ -9113,10 +9113,10 @@ var require_fsevents_handler = __commonJS({
         }
       };
     }
-    var couldConsolidate = (path15) => {
+    var couldConsolidate = (path13) => {
       let count = 0;
       for (const watchPath of FSEventsWatchers.keys()) {
-        if (watchPath.indexOf(path15) === 0) {
+        if (watchPath.indexOf(path13) === 0) {
           count++;
           if (count >= consolidateThreshhold) {
             return true;
@@ -9126,9 +9126,9 @@ var require_fsevents_handler = __commonJS({
       return false;
     };
     var canUse = () => fsevents && FSEventsWatchers.size < 128;
-    var calcDepth = (path15, root) => {
+    var calcDepth = (path13, root) => {
       let i = 0;
-      while (!path15.indexOf(root) && (path15 = sysPath.dirname(path15)) !== root) i++;
+      while (!path13.indexOf(root) && (path13 = sysPath.dirname(path13)) !== root) i++;
       return i;
     };
     var sameTypes = (info, stats) => info.type === FSEVENT_TYPE_DIRECTORY && stats.isDirectory() || info.type === FSEVENT_TYPE_SYMLINK && stats.isSymbolicLink() || info.type === FSEVENT_TYPE_FILE && stats.isFile();
@@ -9139,41 +9139,41 @@ var require_fsevents_handler = __commonJS({
       constructor(fsw) {
         this.fsw = fsw;
       }
-      checkIgnored(path15, stats) {
+      checkIgnored(path13, stats) {
         const ipaths = this.fsw._ignoredPaths;
-        if (this.fsw._isIgnored(path15, stats)) {
-          ipaths.add(path15);
+        if (this.fsw._isIgnored(path13, stats)) {
+          ipaths.add(path13);
           if (stats && stats.isDirectory()) {
-            ipaths.add(path15 + ROOT_GLOBSTAR);
+            ipaths.add(path13 + ROOT_GLOBSTAR);
           }
           return true;
         }
-        ipaths.delete(path15);
-        ipaths.delete(path15 + ROOT_GLOBSTAR);
+        ipaths.delete(path13);
+        ipaths.delete(path13 + ROOT_GLOBSTAR);
       }
-      addOrChange(path15, fullPath, realPath, parent, watchedDir, item, info, opts) {
+      addOrChange(path13, fullPath, realPath, parent, watchedDir, item, info, opts) {
         const event = watchedDir.has(item) ? EV_CHANGE : EV_ADD;
-        this.handleEvent(event, path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+        this.handleEvent(event, path13, fullPath, realPath, parent, watchedDir, item, info, opts);
       }
-      async checkExists(path15, fullPath, realPath, parent, watchedDir, item, info, opts) {
+      async checkExists(path13, fullPath, realPath, parent, watchedDir, item, info, opts) {
         try {
-          const stats = await stat(path15);
+          const stats = await stat(path13);
           if (this.fsw.closed) return;
           if (sameTypes(info, stats)) {
-            this.addOrChange(path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+            this.addOrChange(path13, fullPath, realPath, parent, watchedDir, item, info, opts);
           } else {
-            this.handleEvent(EV_UNLINK, path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+            this.handleEvent(EV_UNLINK, path13, fullPath, realPath, parent, watchedDir, item, info, opts);
           }
         } catch (error) {
           if (error.code === "EACCES") {
-            this.addOrChange(path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+            this.addOrChange(path13, fullPath, realPath, parent, watchedDir, item, info, opts);
           } else {
-            this.handleEvent(EV_UNLINK, path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+            this.handleEvent(EV_UNLINK, path13, fullPath, realPath, parent, watchedDir, item, info, opts);
           }
         }
       }
-      handleEvent(event, path15, fullPath, realPath, parent, watchedDir, item, info, opts) {
-        if (this.fsw.closed || this.checkIgnored(path15)) return;
+      handleEvent(event, path13, fullPath, realPath, parent, watchedDir, item, info, opts) {
+        if (this.fsw.closed || this.checkIgnored(path13)) return;
         if (event === EV_UNLINK) {
           const isDirectory = info.type === FSEVENT_TYPE_DIRECTORY;
           if (isDirectory || watchedDir.has(item)) {
@@ -9181,16 +9181,16 @@ var require_fsevents_handler = __commonJS({
           }
         } else {
           if (event === EV_ADD) {
-            if (info.type === FSEVENT_TYPE_DIRECTORY) this.fsw._getWatchedDir(path15);
+            if (info.type === FSEVENT_TYPE_DIRECTORY) this.fsw._getWatchedDir(path13);
             if (info.type === FSEVENT_TYPE_SYMLINK && opts.followSymlinks) {
               const curDepth = opts.depth === void 0 ? void 0 : calcDepth(fullPath, realPath) + 1;
-              return this._addToFsEvents(path15, false, true, curDepth);
+              return this._addToFsEvents(path13, false, true, curDepth);
             }
             this.fsw._getWatchedDir(parent).add(item);
           }
           const eventName = info.type === FSEVENT_TYPE_DIRECTORY ? event + DIR_SUFFIX : event;
-          this.fsw._emit(eventName, path15);
-          if (eventName === EV_ADD_DIR) this._addToFsEvents(path15, false, true);
+          this.fsw._emit(eventName, path13);
+          if (eventName === EV_ADD_DIR) this._addToFsEvents(path13, false, true);
         }
       }
       /**
@@ -9207,41 +9207,41 @@ var require_fsevents_handler = __commonJS({
         const watchCallback = async (fullPath, flags, info) => {
           if (this.fsw.closed) return;
           if (opts.depth !== void 0 && calcDepth(fullPath, realPath) > opts.depth) return;
-          const path15 = transform(sysPath.join(
+          const path13 = transform(sysPath.join(
             watchPath,
             sysPath.relative(watchPath, fullPath)
           ));
-          if (globFilter && !globFilter(path15)) return;
-          const parent = sysPath.dirname(path15);
-          const item = sysPath.basename(path15);
+          if (globFilter && !globFilter(path13)) return;
+          const parent = sysPath.dirname(path13);
+          const item = sysPath.basename(path13);
           const watchedDir = this.fsw._getWatchedDir(
-            info.type === FSEVENT_TYPE_DIRECTORY ? path15 : parent
+            info.type === FSEVENT_TYPE_DIRECTORY ? path13 : parent
           );
           if (wrongEventFlags.has(flags) || info.event === FSEVENT_UNKNOWN) {
             if (typeof opts.ignored === FUNCTION_TYPE) {
               let stats;
               try {
-                stats = await stat(path15);
+                stats = await stat(path13);
               } catch (error) {
               }
               if (this.fsw.closed) return;
-              if (this.checkIgnored(path15, stats)) return;
+              if (this.checkIgnored(path13, stats)) return;
               if (sameTypes(info, stats)) {
-                this.addOrChange(path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+                this.addOrChange(path13, fullPath, realPath, parent, watchedDir, item, info, opts);
               } else {
-                this.handleEvent(EV_UNLINK, path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+                this.handleEvent(EV_UNLINK, path13, fullPath, realPath, parent, watchedDir, item, info, opts);
               }
             } else {
-              this.checkExists(path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+              this.checkExists(path13, fullPath, realPath, parent, watchedDir, item, info, opts);
             }
           } else {
             switch (info.event) {
               case FSEVENT_CREATED:
               case FSEVENT_MODIFIED:
-                return this.addOrChange(path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+                return this.addOrChange(path13, fullPath, realPath, parent, watchedDir, item, info, opts);
               case FSEVENT_DELETED:
               case FSEVENT_MOVED:
-                return this.checkExists(path15, fullPath, realPath, parent, watchedDir, item, info, opts);
+                return this.checkExists(path13, fullPath, realPath, parent, watchedDir, item, info, opts);
             }
           }
         };
@@ -9273,12 +9273,12 @@ var require_fsevents_handler = __commonJS({
             return this.fsw._emitReady();
           }
           this.fsw._incrReadyCount();
-          this._addToFsEvents(linkTarget || linkPath, (path15) => {
+          this._addToFsEvents(linkTarget || linkPath, (path13) => {
             let aliasedPath = linkPath;
             if (linkTarget && linkTarget !== DOT_SLASH) {
-              aliasedPath = path15.replace(linkTarget, linkPath);
-            } else if (path15 !== DOT_SLASH) {
-              aliasedPath = sysPath.join(linkPath, path15);
+              aliasedPath = path13.replace(linkTarget, linkPath);
+            } else if (path13 !== DOT_SLASH) {
+              aliasedPath = sysPath.join(linkPath, path13);
             }
             return transform(aliasedPath);
           }, false, curDepth);
@@ -9305,7 +9305,7 @@ var require_fsevents_handler = __commonJS({
           this.fsw._emit(isDir ? EV_ADD_DIR : EV_ADD, pp, stats);
         }
       }
-      initWatch(realPath, path15, wh, processPath) {
+      initWatch(realPath, path13, wh, processPath) {
         if (this.fsw.closed) return;
         const closer = this._watchWithFsEvents(
           wh.watchPath,
@@ -9313,7 +9313,7 @@ var require_fsevents_handler = __commonJS({
           processPath,
           wh.globFilter
         );
-        this.fsw._addPathCloser(path15, closer);
+        this.fsw._addPathCloser(path13, closer);
       }
       /**
        * Handle added path with fsevents
@@ -9323,13 +9323,13 @@ var require_fsevents_handler = __commonJS({
        * @param {Number=} priorDepth Level of subdirectories already traversed.
        * @returns {Promise<void>}
        */
-      async _addToFsEvents(path15, transform, forceAdd, priorDepth) {
+      async _addToFsEvents(path13, transform, forceAdd, priorDepth) {
         if (this.fsw.closed) {
           return;
         }
         const opts = this.fsw.options;
         const processPath = typeof transform === FUNCTION_TYPE ? transform : IDENTITY_FN;
-        const wh = this.fsw._getWatchHelpers(path15);
+        const wh = this.fsw._getWatchHelpers(path13);
         try {
           const stats = await statMethods[wh.statMethod](wh.watchPath);
           if (this.fsw.closed) return;
@@ -9337,7 +9337,7 @@ var require_fsevents_handler = __commonJS({
             throw null;
           }
           if (stats.isDirectory()) {
-            if (!wh.globFilter) this.emitAdd(processPath(path15), stats, processPath, opts, forceAdd);
+            if (!wh.globFilter) this.emitAdd(processPath(path13), stats, processPath, opts, forceAdd);
             if (priorDepth && priorDepth > opts.depth) return;
             this.fsw._readdirp(wh.watchPath, {
               fileFilter: (entry) => wh.filterPath(entry),
@@ -9371,14 +9371,14 @@ var require_fsevents_handler = __commonJS({
         }
         if (opts.persistent && forceAdd !== true) {
           if (typeof transform === FUNCTION_TYPE) {
-            this.initWatch(void 0, path15, wh, processPath);
+            this.initWatch(void 0, path13, wh, processPath);
           } else {
             let realPath;
             try {
               realPath = await realpath(wh.watchPath);
             } catch (e) {
             }
-            this.initWatch(realPath, path15, wh, processPath);
+            this.initWatch(realPath, path13, wh, processPath);
           }
         }
       }
@@ -9393,7 +9393,7 @@ var require_chokidar = __commonJS({
   "node_modules/chokidar/index.js"(exports2) {
     "use strict";
     var { EventEmitter } = require("events");
-    var fs18 = require("fs");
+    var fs16 = require("fs");
     var sysPath = require("path");
     var { promisify } = require("util");
     var readdirp = require_readdirp();
@@ -9438,8 +9438,8 @@ var require_chokidar = __commonJS({
       isMacos,
       isIBMi
     } = require_constants3();
-    var stat = promisify(fs18.stat);
-    var readdir = promisify(fs18.readdir);
+    var stat = promisify(fs16.stat);
+    var readdir = promisify(fs16.readdir);
     var arrify = (value = []) => Array.isArray(value) ? value : [value];
     var flatten = (list, result = []) => {
       list.forEach((item) => {
@@ -9472,19 +9472,19 @@ var require_chokidar = __commonJS({
       }
       return str;
     };
-    var normalizePathToUnix = (path15) => toUnix(sysPath.normalize(toUnix(path15)));
-    var normalizeIgnored = (cwd = EMPTY_STR) => (path15) => {
-      if (typeof path15 !== STRING_TYPE) return path15;
-      return normalizePathToUnix(sysPath.isAbsolute(path15) ? path15 : sysPath.join(cwd, path15));
+    var normalizePathToUnix = (path13) => toUnix(sysPath.normalize(toUnix(path13)));
+    var normalizeIgnored = (cwd = EMPTY_STR) => (path13) => {
+      if (typeof path13 !== STRING_TYPE) return path13;
+      return normalizePathToUnix(sysPath.isAbsolute(path13) ? path13 : sysPath.join(cwd, path13));
     };
-    var getAbsolutePath = (path15, cwd) => {
-      if (sysPath.isAbsolute(path15)) {
-        return path15;
+    var getAbsolutePath = (path13, cwd) => {
+      if (sysPath.isAbsolute(path13)) {
+        return path13;
       }
-      if (path15.startsWith(BANG)) {
-        return BANG + sysPath.join(cwd, path15.slice(1));
+      if (path13.startsWith(BANG)) {
+        return BANG + sysPath.join(cwd, path13.slice(1));
       }
-      return sysPath.join(cwd, path15);
+      return sysPath.join(cwd, path13);
     };
     var undef = (opts, key) => opts[key] === void 0;
     var DirEntry = class {
@@ -9540,16 +9540,16 @@ var require_chokidar = __commonJS({
     var STAT_METHOD_F = "stat";
     var STAT_METHOD_L = "lstat";
     var WatchHelper = class {
-      constructor(path15, watchPath, follow, fsw) {
+      constructor(path13, watchPath, follow, fsw) {
         this.fsw = fsw;
-        this.path = path15 = path15.replace(REPLACER_RE, EMPTY_STR);
+        this.path = path13 = path13.replace(REPLACER_RE, EMPTY_STR);
         this.watchPath = watchPath;
         this.fullWatchPath = sysPath.resolve(watchPath);
-        this.hasGlob = watchPath !== path15;
-        if (path15 === EMPTY_STR) this.hasGlob = false;
+        this.hasGlob = watchPath !== path13;
+        if (path13 === EMPTY_STR) this.hasGlob = false;
         this.globSymlink = this.hasGlob && follow ? void 0 : false;
-        this.globFilter = this.hasGlob ? anymatch(path15, void 0, ANYMATCH_OPTS) : false;
-        this.dirParts = this.getDirParts(path15);
+        this.globFilter = this.hasGlob ? anymatch(path13, void 0, ANYMATCH_OPTS) : false;
+        this.dirParts = this.getDirParts(path13);
         this.dirParts.forEach((parts) => {
           if (parts.length > 1) parts.pop();
         });
@@ -9578,12 +9578,12 @@ var require_chokidar = __commonJS({
         const matchesGlob = this.hasGlob && typeof this.globFilter === FUNCTION_TYPE ? this.globFilter(resolvedPath) : true;
         return matchesGlob && this.fsw._isntIgnored(resolvedPath, stats) && this.fsw._hasReadPermissions(stats);
       }
-      getDirParts(path15) {
+      getDirParts(path13) {
         if (!this.hasGlob) return [];
         const parts = [];
-        const expandedPath = path15.includes(BRACE_START) ? braces.expand(path15) : [path15];
-        expandedPath.forEach((path16) => {
-          parts.push(sysPath.relative(this.watchPath, path16).split(SLASH_OR_BACK_SLASH_RE));
+        const expandedPath = path13.includes(BRACE_START) ? braces.expand(path13) : [path13];
+        expandedPath.forEach((path14) => {
+          parts.push(sysPath.relative(this.watchPath, path14).split(SLASH_OR_BACK_SLASH_RE));
         });
         return parts;
       }
@@ -9689,34 +9689,34 @@ var require_chokidar = __commonJS({
         this.closed = false;
         let paths = unifyPaths(paths_);
         if (cwd) {
-          paths = paths.map((path15) => {
-            const absPath = getAbsolutePath(path15, cwd);
-            if (disableGlobbing || !isGlob(path15)) {
+          paths = paths.map((path13) => {
+            const absPath = getAbsolutePath(path13, cwd);
+            if (disableGlobbing || !isGlob(path13)) {
               return absPath;
             }
             return normalizePath(absPath);
           });
         }
-        paths = paths.filter((path15) => {
-          if (path15.startsWith(BANG)) {
-            this._ignoredPaths.add(path15.slice(1));
+        paths = paths.filter((path13) => {
+          if (path13.startsWith(BANG)) {
+            this._ignoredPaths.add(path13.slice(1));
             return false;
           }
-          this._ignoredPaths.delete(path15);
-          this._ignoredPaths.delete(path15 + SLASH_GLOBSTAR);
+          this._ignoredPaths.delete(path13);
+          this._ignoredPaths.delete(path13 + SLASH_GLOBSTAR);
           this._userIgnored = void 0;
           return true;
         });
         if (this.options.useFsEvents && this._fsEventsHandler) {
           if (!this._readyCount) this._readyCount = paths.length;
           if (this.options.persistent) this._readyCount += paths.length;
-          paths.forEach((path15) => this._fsEventsHandler._addToFsEvents(path15));
+          paths.forEach((path13) => this._fsEventsHandler._addToFsEvents(path13));
         } else {
           if (!this._readyCount) this._readyCount = 0;
           this._readyCount += paths.length;
           Promise.all(
-            paths.map(async (path15) => {
-              const res = await this._nodeFsHandler._addToNodeFs(path15, !_internal, 0, 0, _origAdd);
+            paths.map(async (path13) => {
+              const res = await this._nodeFsHandler._addToNodeFs(path13, !_internal, 0, 0, _origAdd);
               if (res) this._emitReady();
               return res;
             })
@@ -9738,15 +9738,15 @@ var require_chokidar = __commonJS({
         if (this.closed) return this;
         const paths = unifyPaths(paths_);
         const { cwd } = this.options;
-        paths.forEach((path15) => {
-          if (!sysPath.isAbsolute(path15) && !this._closers.has(path15)) {
-            if (cwd) path15 = sysPath.join(cwd, path15);
-            path15 = sysPath.resolve(path15);
+        paths.forEach((path13) => {
+          if (!sysPath.isAbsolute(path13) && !this._closers.has(path13)) {
+            if (cwd) path13 = sysPath.join(cwd, path13);
+            path13 = sysPath.resolve(path13);
           }
-          this._closePath(path15);
-          this._ignoredPaths.add(path15);
-          if (this._watched.has(path15)) {
-            this._ignoredPaths.add(path15 + SLASH_GLOBSTAR);
+          this._closePath(path13);
+          this._ignoredPaths.add(path13);
+          if (this._watched.has(path13)) {
+            this._ignoredPaths.add(path13 + SLASH_GLOBSTAR);
           }
           this._userIgnored = void 0;
         });
@@ -9804,36 +9804,36 @@ var require_chokidar = __commonJS({
        * @param {*=} val3
        * @returns the error if defined, otherwise the value of the FSWatcher instance's `closed` flag
        */
-      async _emit(event, path15, val1, val2, val3) {
+      async _emit(event, path13, val1, val2, val3) {
         if (this.closed) return;
         const opts = this.options;
-        if (isWindows) path15 = sysPath.normalize(path15);
-        if (opts.cwd) path15 = sysPath.relative(opts.cwd, path15);
-        const args = [event, path15];
+        if (isWindows) path13 = sysPath.normalize(path13);
+        if (opts.cwd) path13 = sysPath.relative(opts.cwd, path13);
+        const args = [event, path13];
         if (val3 !== void 0) args.push(val1, val2, val3);
         else if (val2 !== void 0) args.push(val1, val2);
         else if (val1 !== void 0) args.push(val1);
         const awf = opts.awaitWriteFinish;
         let pw;
-        if (awf && (pw = this._pendingWrites.get(path15))) {
+        if (awf && (pw = this._pendingWrites.get(path13))) {
           pw.lastChange = /* @__PURE__ */ new Date();
           return this;
         }
         if (opts.atomic) {
           if (event === EV_UNLINK) {
-            this._pendingUnlinks.set(path15, args);
+            this._pendingUnlinks.set(path13, args);
             setTimeout(() => {
-              this._pendingUnlinks.forEach((entry, path16) => {
+              this._pendingUnlinks.forEach((entry, path14) => {
                 this.emit(...entry);
                 this.emit(EV_ALL, ...entry);
-                this._pendingUnlinks.delete(path16);
+                this._pendingUnlinks.delete(path14);
               });
             }, typeof opts.atomic === "number" ? opts.atomic : 100);
             return this;
           }
-          if (event === EV_ADD && this._pendingUnlinks.has(path15)) {
+          if (event === EV_ADD && this._pendingUnlinks.has(path13)) {
             event = args[0] = EV_CHANGE;
-            this._pendingUnlinks.delete(path15);
+            this._pendingUnlinks.delete(path13);
           }
         }
         if (awf && (event === EV_ADD || event === EV_CHANGE) && this._readyEmitted) {
@@ -9851,15 +9851,15 @@ var require_chokidar = __commonJS({
               this.emitWithAll(event, args);
             }
           };
-          this._awaitWriteFinish(path15, awf.stabilityThreshold, event, awfEmit);
+          this._awaitWriteFinish(path13, awf.stabilityThreshold, event, awfEmit);
           return this;
         }
         if (event === EV_CHANGE) {
-          const isThrottled = !this._throttle(EV_CHANGE, path15, 50);
+          const isThrottled = !this._throttle(EV_CHANGE, path13, 50);
           if (isThrottled) return this;
         }
         if (opts.alwaysStat && val1 === void 0 && (event === EV_ADD || event === EV_ADD_DIR || event === EV_CHANGE)) {
-          const fullPath = opts.cwd ? sysPath.join(opts.cwd, path15) : path15;
+          const fullPath = opts.cwd ? sysPath.join(opts.cwd, path13) : path13;
           let stats;
           try {
             stats = await stat(fullPath);
@@ -9890,28 +9890,28 @@ var require_chokidar = __commonJS({
        * @param {Number} timeout duration of time to suppress duplicate actions
        * @returns {Object|false} tracking object or false if action should be suppressed
        */
-      _throttle(actionType, path15, timeout) {
+      _throttle(actionType, path13, timeout) {
         if (!this._throttled.has(actionType)) {
           this._throttled.set(actionType, /* @__PURE__ */ new Map());
         }
         const action = this._throttled.get(actionType);
-        const actionPath = action.get(path15);
+        const actionPath = action.get(path13);
         if (actionPath) {
           actionPath.count++;
           return false;
         }
         let timeoutObject;
         const clear = () => {
-          const item = action.get(path15);
+          const item = action.get(path13);
           const count = item ? item.count : 0;
-          action.delete(path15);
+          action.delete(path13);
           clearTimeout(timeoutObject);
           if (item) clearTimeout(item.timeoutObject);
           return count;
         };
         timeoutObject = setTimeout(clear, timeout);
         const thr = { timeoutObject, clear, count: 0 };
-        action.set(path15, thr);
+        action.set(path13, thr);
         return thr;
       }
       _incrReadyCount() {
@@ -9925,27 +9925,27 @@ var require_chokidar = __commonJS({
        * @param {EventName} event
        * @param {Function} awfEmit Callback to be called when ready for event to be emitted.
        */
-      _awaitWriteFinish(path15, threshold, event, awfEmit) {
+      _awaitWriteFinish(path13, threshold, event, awfEmit) {
         let timeoutHandler;
-        let fullPath = path15;
-        if (this.options.cwd && !sysPath.isAbsolute(path15)) {
-          fullPath = sysPath.join(this.options.cwd, path15);
+        let fullPath = path13;
+        if (this.options.cwd && !sysPath.isAbsolute(path13)) {
+          fullPath = sysPath.join(this.options.cwd, path13);
         }
         const now = /* @__PURE__ */ new Date();
         const awaitWriteFinish = (prevStat) => {
-          fs18.stat(fullPath, (err, curStat) => {
-            if (err || !this._pendingWrites.has(path15)) {
+          fs16.stat(fullPath, (err, curStat) => {
+            if (err || !this._pendingWrites.has(path13)) {
               if (err && err.code !== "ENOENT") awfEmit(err);
               return;
             }
             const now2 = Number(/* @__PURE__ */ new Date());
             if (prevStat && curStat.size !== prevStat.size) {
-              this._pendingWrites.get(path15).lastChange = now2;
+              this._pendingWrites.get(path13).lastChange = now2;
             }
-            const pw = this._pendingWrites.get(path15);
+            const pw = this._pendingWrites.get(path13);
             const df = now2 - pw.lastChange;
             if (df >= threshold) {
-              this._pendingWrites.delete(path15);
+              this._pendingWrites.delete(path13);
               awfEmit(void 0, curStat);
             } else {
               timeoutHandler = setTimeout(
@@ -9956,11 +9956,11 @@ var require_chokidar = __commonJS({
             }
           });
         };
-        if (!this._pendingWrites.has(path15)) {
-          this._pendingWrites.set(path15, {
+        if (!this._pendingWrites.has(path13)) {
+          this._pendingWrites.set(path13, {
             lastChange: now,
             cancelWait: () => {
-              this._pendingWrites.delete(path15);
+              this._pendingWrites.delete(path13);
               clearTimeout(timeoutHandler);
               return event;
             }
@@ -9980,20 +9980,20 @@ var require_chokidar = __commonJS({
        * @param {fs.Stats=} stats result of fs.stat
        * @returns {Boolean}
        */
-      _isIgnored(path15, stats) {
-        if (this.options.atomic && DOT_RE.test(path15)) return true;
+      _isIgnored(path13, stats) {
+        if (this.options.atomic && DOT_RE.test(path13)) return true;
         if (!this._userIgnored) {
           const { cwd } = this.options;
           const ign = this.options.ignored;
           const ignored = ign && ign.map(normalizeIgnored(cwd));
-          const paths = arrify(ignored).filter((path16) => typeof path16 === STRING_TYPE && !isGlob(path16)).map((path16) => path16 + SLASH_GLOBSTAR);
+          const paths = arrify(ignored).filter((path14) => typeof path14 === STRING_TYPE && !isGlob(path14)).map((path14) => path14 + SLASH_GLOBSTAR);
           const list = this._getGlobIgnored().map(normalizeIgnored(cwd)).concat(ignored, paths);
           this._userIgnored = anymatch(list, void 0, ANYMATCH_OPTS);
         }
-        return this._userIgnored([path15, stats]);
+        return this._userIgnored([path13, stats]);
       }
-      _isntIgnored(path15, stat2) {
-        return !this._isIgnored(path15, stat2);
+      _isntIgnored(path13, stat2) {
+        return !this._isIgnored(path13, stat2);
       }
       /**
        * Provides a set of common helpers and properties relating to symlink and glob handling.
@@ -10001,10 +10001,10 @@ var require_chokidar = __commonJS({
        * @param {Number=} depth at any depth > 0, this isn't a glob
        * @returns {WatchHelper} object containing helpers for this path
        */
-      _getWatchHelpers(path15, depth) {
-        const watchPath = depth || this.options.disableGlobbing || !isGlob(path15) ? path15 : globParent(path15);
+      _getWatchHelpers(path13, depth) {
+        const watchPath = depth || this.options.disableGlobbing || !isGlob(path13) ? path13 : globParent(path13);
         const follow = this.options.followSymlinks;
-        return new WatchHelper(path15, watchPath, follow, this);
+        return new WatchHelper(path13, watchPath, follow, this);
       }
       // Directory helpers
       // -----------------
@@ -10043,66 +10043,66 @@ var require_chokidar = __commonJS({
        * @returns {void}
       */
       _remove(directory, item, isDirectory) {
-        const path15 = sysPath.join(directory, item);
-        const fullPath = sysPath.resolve(path15);
-        isDirectory = isDirectory != null ? isDirectory : this._watched.has(path15) || this._watched.has(fullPath);
-        if (!this._throttle("remove", path15, 100)) return;
+        const path13 = sysPath.join(directory, item);
+        const fullPath = sysPath.resolve(path13);
+        isDirectory = isDirectory != null ? isDirectory : this._watched.has(path13) || this._watched.has(fullPath);
+        if (!this._throttle("remove", path13, 100)) return;
         if (!isDirectory && !this.options.useFsEvents && this._watched.size === 1) {
           this.add(directory, item, true);
         }
-        const wp = this._getWatchedDir(path15);
+        const wp = this._getWatchedDir(path13);
         const nestedDirectoryChildren = wp.getChildren();
-        nestedDirectoryChildren.forEach((nested) => this._remove(path15, nested));
+        nestedDirectoryChildren.forEach((nested) => this._remove(path13, nested));
         const parent = this._getWatchedDir(directory);
         const wasTracked = parent.has(item);
         parent.remove(item);
         if (this._symlinkPaths.has(fullPath)) {
           this._symlinkPaths.delete(fullPath);
         }
-        let relPath = path15;
-        if (this.options.cwd) relPath = sysPath.relative(this.options.cwd, path15);
+        let relPath = path13;
+        if (this.options.cwd) relPath = sysPath.relative(this.options.cwd, path13);
         if (this.options.awaitWriteFinish && this._pendingWrites.has(relPath)) {
           const event = this._pendingWrites.get(relPath).cancelWait();
           if (event === EV_ADD) return;
         }
-        this._watched.delete(path15);
+        this._watched.delete(path13);
         this._watched.delete(fullPath);
         const eventName = isDirectory ? EV_UNLINK_DIR : EV_UNLINK;
-        if (wasTracked && !this._isIgnored(path15)) this._emit(eventName, path15);
+        if (wasTracked && !this._isIgnored(path13)) this._emit(eventName, path13);
         if (!this.options.useFsEvents) {
-          this._closePath(path15);
+          this._closePath(path13);
         }
       }
       /**
        * Closes all watchers for a path
        * @param {Path} path
        */
-      _closePath(path15) {
-        this._closeFile(path15);
-        const dir = sysPath.dirname(path15);
-        this._getWatchedDir(dir).remove(sysPath.basename(path15));
+      _closePath(path13) {
+        this._closeFile(path13);
+        const dir = sysPath.dirname(path13);
+        this._getWatchedDir(dir).remove(sysPath.basename(path13));
       }
       /**
        * Closes only file-specific watchers
        * @param {Path} path
        */
-      _closeFile(path15) {
-        const closers = this._closers.get(path15);
+      _closeFile(path13) {
+        const closers = this._closers.get(path13);
         if (!closers) return;
         closers.forEach((closer) => closer());
-        this._closers.delete(path15);
+        this._closers.delete(path13);
       }
       /**
        *
        * @param {Path} path
        * @param {Function} closer
        */
-      _addPathCloser(path15, closer) {
+      _addPathCloser(path13, closer) {
         if (!closer) return;
-        let list = this._closers.get(path15);
+        let list = this._closers.get(path13);
         if (!list) {
           list = [];
-          this._closers.set(path15, list);
+          this._closers.set(path13, list);
         }
         list.push(closer);
       }
@@ -10134,9 +10134,9 @@ var require_chokidar = __commonJS({
 });
 
 // src/cli.ts
-var import_fs17 = __toESM(require("fs"), 1);
-var import_path14 = __toESM(require("path"), 1);
-var import_os8 = __toESM(require("os"), 1);
+var import_fs15 = __toESM(require("fs"), 1);
+var import_path12 = __toESM(require("path"), 1);
+var import_os6 = __toESM(require("os"), 1);
 
 // node_modules/commander/esm.mjs
 var import_index = __toESM(require_commander(), 1);
@@ -15213,9 +15213,6 @@ async function syncToServer(days, dryRun) {
           "x-enrollment-token": config.enrollmentToken
         },
         body: JSON.stringify(payload),
-        // Generous timeout: the server may be cold-starting (Render free tier
-        // can take 30-60s to wake) and large rollups take a few seconds to
-        // persist. A short timeout aborts mid-write and reports a false failure.
         signal: AbortSignal.timeout(6e4)
       });
       if (res.ok) {
@@ -15251,346 +15248,8 @@ async function syncToServer(days, dryRun) {
   };
 }
 
-// src/core/daemon.ts
-var import_fs15 = __toESM(require("fs"), 1);
-var import_path12 = __toESM(require("path"), 1);
-var import_os6 = __toESM(require("os"), 1);
-var AIOPS_DIR3 = import_path12.default.join(import_os6.default.homedir(), ".aiops");
-var PID_FILE = import_path12.default.join(AIOPS_DIR3, "daemon.pid");
-var LOG_FILE2 = import_path12.default.join(AIOPS_DIR3, "daemon.log");
-var DEBOUNCE_MS = 2 * 60 * 1e3;
-var INTERVAL_MS = 15 * 60 * 1e3;
-var LOG_MAX_BYTES = 500 * 1024;
-function daemonLog(msg) {
-  const line = `[${(/* @__PURE__ */ new Date()).toISOString()}] ${msg}
-`;
-  try {
-    import_fs15.default.mkdirSync(AIOPS_DIR3, { recursive: true });
-    try {
-      if (import_fs15.default.statSync(LOG_FILE2).size > LOG_MAX_BYTES) {
-        const old = import_fs15.default.readFileSync(LOG_FILE2, "utf8");
-        import_fs15.default.writeFileSync(LOG_FILE2, old.slice(-Math.floor(LOG_MAX_BYTES / 2)));
-      }
-    } catch {
-    }
-    import_fs15.default.appendFileSync(LOG_FILE2, line);
-  } catch {
-  }
-}
-function writePid() {
-  try {
-    import_fs15.default.mkdirSync(AIOPS_DIR3, { recursive: true });
-    import_fs15.default.writeFileSync(PID_FILE, String(process.pid));
-  } catch {
-  }
-}
-function readDaemonPid() {
-  try {
-    const n = parseInt(import_fs15.default.readFileSync(PID_FILE, "utf8").trim(), 10);
-    return isNaN(n) ? null : n;
-  } catch {
-    return null;
-  }
-}
-function isDaemonAlive() {
-  const pid = readDaemonPid();
-  if (pid === null) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-function stopDaemon() {
-  const pid = readDaemonPid();
-  if (pid === null) return false;
-  try {
-    process.kill(pid, "SIGTERM");
-    return true;
-  } catch {
-    return false;
-  }
-}
-async function scanAndSync(reason) {
-  daemonLog(`Scan triggered: ${reason}`);
-  try {
-    const sessions = runAllAdapters().flatMap((r) => r.sessions);
-    if (sessions.length) {
-      openDb();
-      upsertSessions(sessions);
-      const stats = getDbStats();
-      daemonLog(`Scanned: ${stats.totalRows} sessions in DB`);
-    }
-    if (isEnrolled()) {
-      const result = await syncToServer(30, false);
-      if (result.success) {
-        daemonLog(`Sync OK \u2014 ${result.aggregatesSent} aggregates, ${result.daysIncluded} days`);
-      } else {
-        daemonLog(`Sync failed: ${result.error ?? "unknown error"}`);
-      }
-    } else {
-      daemonLog("Scan complete (not enrolled \u2014 local only)");
-    }
-  } catch (err) {
-    logError("daemon", "scanAndSync threw", err);
-    daemonLog(`Error: ${err.message}`);
-  }
-}
-async function startDaemon() {
-  import_fs15.default.mkdirSync(AIOPS_DIR3, { recursive: true });
-  if (isDaemonAlive()) {
-    const existingPid = readDaemonPid();
-    daemonLog(`Already running (PID ${existingPid}). Exiting.`);
-    process.exit(0);
-  }
-  writePid();
-  daemonLog(`Daemon started  PID=${process.pid}  node=${process.version}  platform=${process.platform}`);
-  let debounceTimer = null;
-  const scheduleSync = (reason) => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => scanAndSync(reason), DEBOUNCE_MS);
-  };
-  await scanAndSync("startup");
-  try {
-    watchAll((fp) => {
-      const base = import_path12.default.basename(fp);
-      scheduleSync(`file changed: ${base}`);
-    });
-    daemonLog("File watcher running");
-  } catch (err) {
-    daemonLog(`File watcher unavailable: ${err.message}`);
-  }
-  const intervalId = setInterval(() => scanAndSync("periodic"), INTERVAL_MS);
-  daemonLog(`Periodic sync every ${INTERVAL_MS / 6e4} min`);
-  const cleanup = (sig) => {
-    daemonLog(`${sig} received \u2014 stopping`);
-    clearInterval(intervalId);
-    if (debounceTimer) clearTimeout(debounceTimer);
-    try {
-      import_fs15.default.unlinkSync(PID_FILE);
-    } catch {
-    }
-    process.exit(0);
-  };
-  process.on("SIGTERM", () => cleanup("SIGTERM"));
-  process.on("SIGINT", () => cleanup("SIGINT"));
-  daemonLog("Daemon ready \u2014 watching for AI tool activity");
-  await new Promise(() => {
-  });
-}
-
-// src/core/installer.ts
-var import_fs16 = __toESM(require("fs"), 1);
-var import_path13 = __toESM(require("path"), 1);
-var import_os7 = __toESM(require("os"), 1);
-var import_child_process = require("child_process");
-function executorArgs() {
-  return {
-    exec: process.execPath,
-    // e.g. /usr/local/bin/node or C:\Program Files\nodejs\node.exe
-    script: process.argv[1]
-    // e.g. /usr/local/lib/node_modules/aiops-agent/dist/cli.cjs
-  };
-}
-function install() {
-  if (process.platform === "darwin") return installMac();
-  if (process.platform === "win32") return installWindows();
-  return installLinux();
-}
-function uninstall() {
-  if (process.platform === "darwin") return uninstallMac();
-  if (process.platform === "win32") return uninstallWindows();
-  return uninstallLinux();
-}
-var MAC_LABEL = "com.elliot.aiops";
-var MAC_PLIST_DIR = import_path13.default.join(import_os7.default.homedir(), "Library", "LaunchAgents");
-var MAC_PLIST = import_path13.default.join(MAC_PLIST_DIR, `${MAC_LABEL}.plist`);
-function installMac() {
-  const { exec, script } = executorArgs();
-  const logFile = import_path13.default.join(import_os7.default.homedir(), ".aiops", "daemon.log");
-  const plist = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${MAC_LABEL}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>${exec}</string>
-    <string>${script}</string>
-    <string>daemon</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <dict>
-    <key>SuccessfulExit</key>
-    <false/>
-  </dict>
-  <key>StandardOutPath</key>
-  <string>${logFile}</string>
-  <key>StandardErrorPath</key>
-  <string>${logFile}</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>PATH</key>
-    <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/opt/homebrew/sbin</string>
-    <key>HOME</key>
-    <string>${import_os7.default.homedir()}</string>
-  </dict>
-</dict>
-</plist>`;
-  try {
-    import_fs16.default.mkdirSync(MAC_PLIST_DIR, { recursive: true });
-    import_fs16.default.writeFileSync(MAC_PLIST, plist, "utf8");
-    try {
-      (0, import_child_process.execSync)(`launchctl unload "${MAC_PLIST}" 2>/dev/null`, { stdio: "pipe" });
-    } catch {
-    }
-    (0, import_child_process.execSync)(`launchctl load "${MAC_PLIST}"`, { stdio: "pipe" });
-    return { ok: true, message: `Registered as launchd agent (${MAC_LABEL})`, method: "launchd" };
-  } catch (err) {
-    return { ok: false, message: `macOS install failed: ${err.message}`, method: "launchd" };
-  }
-}
-function uninstallMac() {
-  try {
-    try {
-      (0, import_child_process.execSync)(`launchctl unload "${MAC_PLIST}" 2>/dev/null`, { stdio: "pipe" });
-    } catch {
-    }
-    if (import_fs16.default.existsSync(MAC_PLIST)) import_fs16.default.unlinkSync(MAC_PLIST);
-    return { ok: true, message: "Removed launchd agent", method: "launchd" };
-  } catch (err) {
-    return { ok: false, message: `macOS uninstall failed: ${err.message}`, method: "launchd" };
-  }
-}
-function isMacInstalled() {
-  return import_fs16.default.existsSync(MAC_PLIST);
-}
-var WIN_REG_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-var WIN_REG_VAL = "AIOps Agent";
-var WIN_VBS = import_path13.default.join(import_os7.default.homedir(), ".aiops", "start-daemon.vbs");
-function installWindows() {
-  const { exec, script } = executorArgs();
-  const vbs = `Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run Chr(34) & "${exec.replace(/\\/g, "\\\\")}" & Chr(34) & " " & Chr(34) & "${script.replace(/\\/g, "\\\\")}" & Chr(34) & " daemon", 0, False
-`;
-  try {
-    import_fs16.default.mkdirSync(import_path13.default.dirname(WIN_VBS), { recursive: true });
-    import_fs16.default.writeFileSync(WIN_VBS, vbs, "utf8");
-  } catch (err) {
-    return { ok: false, message: `Failed to write launcher: ${err.message}`, method: "registry" };
-  }
-  const regValue = `wscript.exe "${WIN_VBS}"`;
-  const regCmd = `reg add "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /t REG_SZ /d "${regValue}" /f`;
-  try {
-    (0, import_child_process.execSync)(regCmd, { stdio: "pipe", shell: true });
-  } catch (err) {
-    return { ok: false, message: `Registry write failed: ${err.message}`, method: "registry" };
-  }
-  try {
-    const child = (0, import_child_process.spawn)(exec, [script, "daemon"], {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true
-    });
-    child.unref();
-  } catch {
-  }
-  return { ok: true, message: `Registered in Registry Run key ("${WIN_REG_VAL}")`, method: "registry" };
-}
-function uninstallWindows() {
-  const errors = [];
-  try {
-    (0, import_child_process.execSync)(`reg delete "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /f`, { stdio: "pipe", shell: true });
-  } catch (err) {
-    errors.push(err.message);
-  }
-  try {
-    if (import_fs16.default.existsSync(WIN_VBS)) import_fs16.default.unlinkSync(WIN_VBS);
-  } catch {
-  }
-  if (errors.length) {
-    return { ok: false, message: `Windows uninstall failed: ${errors.join("; ")}`, method: "registry" };
-  }
-  return { ok: true, message: `Removed Registry Run entry ("${WIN_REG_VAL}")`, method: "registry" };
-}
-function isWindowsInstalled() {
-  try {
-    (0, import_child_process.execSync)(`reg query "${WIN_REG_KEY}" /v "${WIN_REG_VAL}"`, { stdio: "pipe", shell: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
-var LINUX_SVC = "aiops";
-var LINUX_SVC_DIR = import_path13.default.join(import_os7.default.homedir(), ".config", "systemd", "user");
-var LINUX_SVC_FILE = import_path13.default.join(LINUX_SVC_DIR, `${LINUX_SVC}.service`);
-function installLinux() {
-  const { exec, script } = executorArgs();
-  const logFile = import_path13.default.join(import_os7.default.homedir(), ".aiops", "daemon.log");
-  const unit = `[Unit]
-Description=AIOps AI Usage Monitor
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=${exec} ${script} daemon
-Restart=on-failure
-RestartSec=15
-StandardOutput=append:${logFile}
-StandardError=append:${logFile}
-Environment="HOME=${import_os7.default.homedir()}"
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-
-[Install]
-WantedBy=default.target
-`;
-  try {
-    import_fs16.default.mkdirSync(LINUX_SVC_DIR, { recursive: true });
-    import_fs16.default.writeFileSync(LINUX_SVC_FILE, unit, "utf8");
-    (0, import_child_process.execSync)("systemctl --user daemon-reload", { stdio: "pipe" });
-    (0, import_child_process.execSync)(`systemctl --user enable ${LINUX_SVC}`, { stdio: "pipe" });
-    (0, import_child_process.execSync)(`systemctl --user start ${LINUX_SVC}`, { stdio: "pipe" });
-    return { ok: true, message: `Registered as systemd user service (${LINUX_SVC})`, method: "systemd" };
-  } catch (err) {
-    return { ok: false, message: `Linux install failed: ${err.message}`, method: "systemd" };
-  }
-}
-function uninstallLinux() {
-  try {
-    try {
-      (0, import_child_process.execSync)(`systemctl --user stop ${LINUX_SVC}`, { stdio: "pipe" });
-    } catch {
-    }
-    try {
-      (0, import_child_process.execSync)(`systemctl --user disable ${LINUX_SVC}`, { stdio: "pipe" });
-    } catch {
-    }
-    if (import_fs16.default.existsSync(LINUX_SVC_FILE)) import_fs16.default.unlinkSync(LINUX_SVC_FILE);
-    try {
-      (0, import_child_process.execSync)("systemctl --user daemon-reload", { stdio: "pipe" });
-    } catch {
-    }
-    return { ok: true, message: `Removed systemd service (${LINUX_SVC})`, method: "systemd" };
-  } catch (err) {
-    return { ok: false, message: `Linux uninstall failed: ${err.message}`, method: "systemd" };
-  }
-}
-function isLinuxInstalled() {
-  return import_fs16.default.existsSync(LINUX_SVC_FILE);
-}
-function isInstalled() {
-  if (process.platform === "darwin") return isMacInstalled();
-  if (process.platform === "win32") return isWindowsInstalled();
-  return isLinuxInstalled();
-}
-
 // src/cli.ts
 var VERSION = "1.0.0";
-var FULL_HISTORY_DAYS = 3650;
 function fmtTokens(n) {
   if (n <= 0) return "\u2014";
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -15826,7 +15485,7 @@ async function cmdScan(opts = {}) {
   }
   for (const et of EXTRA_TOOLS) {
     const p = PATHS[et.pathKey];
-    if (p && import_fs17.default.existsSync(p)) {
+    if (p && import_fs15.default.existsSync(p)) {
       console.log(`  ${source_default.green("\u2705")}  ${source_default.cyan(et.label.padEnd(16))} ${source_default.gray("detected")}`);
     }
   }
@@ -16000,9 +15659,9 @@ async function cmdScan(opts = {}) {
       totalTokens,
       totalCost
     });
-    const reportPath = import_path14.default.join(process.cwd(), "detection-report.json");
+    const reportPath = import_path12.default.join(process.cwd(), "detection-report.json");
     const json = JSON.stringify(report, null, 2);
-    import_fs17.default.writeFileSync(reportPath, json, "utf8");
+    import_fs15.default.writeFileSync(reportPath, json, "utf8");
     const kb = Math.round(json.length / 1024);
     console.log(`  ${source_default.gray("Report saved to")} ${source_default.cyan("detection-report.json")}  ${source_default.gray("(" + kb + " KB)")}`);
   } catch {
@@ -16219,7 +15878,7 @@ function cmdStatus() {
   console.log();
   console.log(source_default.bold("Version       ") + VERSION);
   console.log(source_default.bold("Status        ") + source_default.green("running"));
-  console.log(source_default.bold("OS            ") + process.platform + " " + import_os8.default.release());
+  console.log(source_default.bold("OS            ") + process.platform + " " + import_os6.default.release());
   console.log(source_default.bold("Total Sessions") + " " + (allSessions.length || "\u2014"));
   console.log(source_default.bold("Cost Today    ") + (costToday > 0 ? source_default.green(fmtCost(costToday)) : "\u2014"));
   console.log(source_default.bold("Last Session  ") + (lastSession ? fmtDate(lastSession.sessionTimestamp) : "\u2014"));
@@ -16242,12 +15901,6 @@ function cmdStatus() {
     console.log(source_default.dim("  Server      ") + source_default.yellow("not enrolled"));
     console.log(source_default.dim("  Run         ") + source_default.white("aiops enroll --server URL --token TOKEN"));
   }
-  const daemonRunning = isDaemonAlive();
-  const autoStartOn = isInstalled();
-  const daemonPid = readDaemonPid();
-  console.log();
-  console.log(source_default.bold("Daemon        ") + (daemonRunning ? source_default.green(`running  (PID ${daemonPid})`) : source_default.yellow("stopped")));
-  console.log(source_default.bold("Auto-start    ") + (autoStartOn ? source_default.green("enabled") : source_default.yellow("disabled \u2014 run: aiops install")));
   console.log();
 }
 function cmdTokens() {
@@ -16404,7 +16057,7 @@ function cmdAnalyze(opts) {
   const report = runAnalysis();
   const json = JSON.stringify(report, null, 2);
   if (opts.output) {
-    import_fs17.default.writeFileSync(opts.output, json, "utf8");
+    import_fs15.default.writeFileSync(opts.output, json, "utf8");
     console.error(source_default.green(`Report written to ${opts.output}`));
   } else {
     console.log(json);
@@ -16450,7 +16103,7 @@ async function cmdStart() {
   if (enrolled) {
     try {
       console.log(source_default.white("  Syncing data to company server..."));
-      const result = await syncToServer(FULL_HISTORY_DAYS, false);
+      const result = await syncToServer(28, false);
       if (result.success) {
         syncOk = true;
         console.log(source_default.green("  \u2705 Data synced to server"));
@@ -16514,41 +16167,8 @@ async function cmdStart() {
   divider();
   console.log();
 }
-async function watchTick() {
-  const ts = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  try {
-    openDb();
-    const liveSessions = runAllAdapters().flatMap((r) => r.sessions);
-    if (liveSessions.length) upsertSessions(liveSessions);
-    const total = isAvailable() ? getDbStats().totalRows : liveSessions.length;
-    if (isEnrolled()) {
-      const result = await syncToServer(FULL_HISTORY_DAYS, false);
-      if (result.success) {
-        console.log(source_default.gray(`  [${ts}] `) + source_default.green("\u2713") + source_default.white(` ${total} sessions \u2014 synced ${result.aggregatesSent} aggregates (${result.daysIncluded} days)`));
-      } else {
-        console.log(source_default.gray(`  [${ts}] `) + source_default.yellow("\u26A0") + source_default.white(` ${total} sessions \u2014 sync failed: ${result.error ?? "unknown"}`));
-      }
-    } else {
-      console.log(source_default.gray(`  [${ts}] `) + source_default.white(`${total} sessions saved locally`) + source_default.dim(" (not enrolled \u2014 no sync)"));
-    }
-  } catch (err) {
-    console.log(source_default.gray(`  [${ts}] `) + source_default.yellow("\u26A0 tick failed: " + err.message));
-  }
-}
-async function cmdWatch(opts) {
-  const minutes = Math.max(1, parseInt(opts.interval ?? "5") || 5);
-  console.log();
-  console.log(`  ${source_default.bold.cyan("AIOps Watch")}  ${source_default.gray("v" + VERSION)}`);
-  console.log(source_default.dim(`  Scanning + syncing every ${minutes} min. Press Ctrl+C to stop.`));
-  console.log();
-  await watchTick();
-  setInterval(() => {
-    void watchTick();
-  }, minutes * 6e4);
-}
 program.name("aiops").version(VERSION).description("Monitor AI coding tool usage and costs");
 program.command("start").description("Scan, save and sync everything (recommended)").action(() => cmdStart());
-program.command("watch").description("Keep scanning and syncing to the server continuously (real-time mode)").option("-i, --interval <minutes>", "minutes between scans", "5").action((opts) => cmdWatch(opts));
 program.command("scan").description("Scan AI tools on this machine").option("--json", "Output machine-readable JSON instead of formatted report").action((opts) => cmdScan(opts));
 program.command("summary").description("Alias for scan").action(cmdSummary);
 program.command("report").description("Show usage report (default: today)").option("-w, --weekly", "Weekly report").option("-m, --monthly", "Monthly report").option("-y, --yearly", "Yearly report").action((opts) => {
@@ -16686,7 +16306,7 @@ program.command("enroll").description("Connect to company server with your work 
       body: JSON.stringify({
         enrollment_token: enrollmentToken,
         machine_id: machineId,
-        hostname: import_os8.default.hostname(),
+        hostname: import_os6.default.hostname(),
         os: process.platform
       })
     });
@@ -16715,17 +16335,28 @@ program.command("enroll").description("Connect to company server with your work 
   console.log(source_default.dim("  Run aiops sync to send your data"));
   console.log();
 });
-program.command("sync").description("Send data to company server").option("--days <n>", "How many days of data to send (default: full history)", String(FULL_HISTORY_DAYS)).option("--dry-run", "Preview what would be sent without sending").action(async (opts) => {
+program.command("sync").description("Send data to company server").option("--days <n>", "How many days of data to send").option("--dry-run", "Preview what would be sent without sending").action(async (opts) => {
   if (!isEnrolled()) {
     console.log(source_default.yellow("\n  Not enrolled yet."));
     console.log(source_default.dim("  Run: aiops enroll --server URL --token TOKEN\n"));
     return;
   }
-  const days = parseInt(opts.days ?? String(FULL_HISTORY_DAYS)) || FULL_HISTORY_DAYS;
   const dryRun = !!opts.dryRun;
   openDb();
   const liveSessions = runAllAdapters().flatMap((r) => r.sessions);
   if (liveSessions.length) upsertSessions(liveSessions);
+  let days;
+  if (opts.days) {
+    days = parseInt(opts.days) || 30;
+  } else {
+    const allSessions = getSessionsSince(3650);
+    if (allSessions.length > 0) {
+      const oldest = allSessions[allSessions.length - 1];
+      days = Math.ceil((Date.now() - (oldest.sessionTimestamp || Date.now())) / 864e5) + 1;
+    } else {
+      days = 30;
+    }
+  }
   if (dryRun) {
     console.log(source_default.bold("\n  DRY RUN \u2014 nothing will be sent\n"));
   } else {
@@ -16766,48 +16397,49 @@ program.command("sync").description("Send data to company server").option("--day
   console.log(source_default.dim("  No prompts  ") + "raw text never leaves your machine");
   console.log();
 });
-program.command("daemon").description("Run background sync daemon (normally started automatically by the OS)").action(async () => {
-  await startDaemon();
-});
-program.command("install").description("Register daemon to auto-start at login (Mac: launchd | Windows: Task Scheduler | Linux: systemd)").action(async () => {
+program.command("install").description("Register AIOps Agent to auto-start on login").action(() => {
+  const { execSync } = require("child_process");
+  const HOME2 = import_os6.default.homedir();
+  const aiopsDir = import_path12.default.join(HOME2, ".aiops");
+  const vbsPath = import_path12.default.join(aiopsDir, "start-daemon.vbs");
   console.log();
-  divider();
-  console.log(`  ${source_default.bold.cyan("AIOps Install")}  ${source_default.gray("Setting up auto-start...")}`);
-  divider();
+  console.log(source_default.cyan("\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"));
+  console.log(source_default.cyan("  AIOps Install") + "  Setting up auto-start...");
+  console.log(source_default.cyan("\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"));
   console.log();
-  if (isDaemonAlive()) {
-    console.log(source_default.dim("  Stopping existing daemon..."));
-    stopDaemon();
-    await new Promise((r) => setTimeout(r, 800));
+  if (!import_fs15.default.existsSync(aiopsDir)) import_fs15.default.mkdirSync(aiopsDir, { recursive: true });
+  const aiopsExe = process.platform === "win32" ? String(execSync("where aiops", { encoding: "utf8" }).trim().split("\n")[0]).trim() : "aiops";
+  const vbsContent = [
+    'Set WshShell = CreateObject("WScript.Shell")',
+    `WshShell.Run "cmd /c aiops start >> ""${import_path12.default.join(aiopsDir, "daemon.log")}"" 2>&1", 0, False`
+  ].join("\r\n");
+  import_fs15.default.writeFileSync(vbsPath, vbsContent, "utf8");
+  if (process.platform !== "win32") {
+    console.log(source_default.yellow("  Non-Windows platform \u2014 skipping Task Scheduler."));
+    console.log(source_default.green("  \u2714 VBS written (not applicable on this OS)."));
+    return;
   }
-  const result = install();
-  if (result.ok) {
-    console.log(source_default.green(`  \u2705 ${result.message}`));
-    console.log();
-    console.log(source_default.dim(`  Method:  ${result.method}`));
-    console.log(source_default.dim(`  Trigger: on login + immediately`));
-    console.log(source_default.dim(`  Sync:    ~2 min after each session ends, plus every 15 min`));
-    console.log(source_default.dim(`  Logs:    ${LOG_FILE2}`));
-  } else {
-    console.log(source_default.red(`  \u2717 ${result.message}`));
+  const taskCmd = `schtasks /create /f /tn "AIOps Agent" /tr "wscript.exe \\"${vbsPath}\\"" /sc onlogon /rl limited /delay 0000:30`;
+  let usedRegistry = false;
+  try {
+    execSync(taskCmd, { stdio: "pipe" });
+    console.log(source_default.green('  \u2714 Registered in Task Scheduler ("AIOps Agent")'));
+  } catch {
+    try {
+      const regCmd = `reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "AIOps Agent" /t REG_SZ /d "wscript.exe \\"${vbsPath}\\"" /f`;
+      execSync(regCmd, { stdio: "pipe" });
+      usedRegistry = true;
+      console.log(source_default.green("  \u2714 Registered in Registry Run key (auto-starts on login)"));
+    } catch (regErr) {
+      console.log(source_default.red("  \u2717 Install failed: " + String(regErr)));
+      process.exit(1);
+    }
   }
   console.log();
-  divider();
+  console.log(source_default.cyan("\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"));
   console.log();
-});
-program.command("uninstall").description("Remove auto-start registration and stop the daemon").action(async () => {
-  console.log();
-  if (isDaemonAlive()) {
-    console.log(source_default.dim("  Stopping daemon..."));
-    stopDaemon();
-    await new Promise((r) => setTimeout(r, 800));
-  }
-  const result = uninstall();
-  if (result.ok) {
-    console.log(source_default.green(`  \u2705 ${result.message}`));
-  } else {
-    console.log(source_default.red(`  \u2717 ${result.message}`));
-  }
+  console.log("  " + source_default.green("\u2714") + " Auto-start enabled" + (usedRegistry ? source_default.dim(" (via Registry)") : source_default.dim(" (via Task Scheduler)")));
+  console.log("  " + source_default.dim("Run") + " " + source_default.white("aiops start") + source_default.dim(" now to sync immediately."));
   console.log();
 });
 program.parseAsync(process.argv).catch((err) => {
