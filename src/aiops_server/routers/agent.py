@@ -234,11 +234,8 @@ async def agent_sync(
         # reclassification, and old token-based idempotency keys, all of which
         # left stale rows behind that inflated dashboard counts.
         dates = sorted(payload_dates)
-        # Remove stale rows for the covered dates — two cases:
-        # 1. Same machine_id, different device (re-enrollment created a new row)
-        # 2. Old token-based idempotency keys (NOT LIKE 'dev%') — these come from
-        #    enrollments before the key format changed; machine_id may differ
-        #    (old /enroll/device flow hashed differently than /api/enroll).
+        # Remove stale rows for covered dates from any device that shares
+        # the same user + machine_id (handles re-enrollment duplicates).
         await conn.execute(
             """
             DELETE FROM usage u
@@ -251,16 +248,6 @@ async def agent_sync(
             """,
             device_id, dates, usage_ikeys,
         )
-        # Also wipe any old-format (token-hash) rows for this user on these dates
-        await conn.execute(
-            """
-            DELETE FROM usage
-            WHERE user_id = $1
-              AND date = ANY($2::date[])
-              AND idempotency_key NOT LIKE 'dev%'
-            """,
-            user_id, dates,
-        )
         await conn.execute(
             """
             DELETE FROM usage_categories u
@@ -272,15 +259,6 @@ async def agent_sync(
               AND u.idempotency_key != ALL($3::text[])
             """,
             device_id, dates, category_ikeys,
-        )
-        await conn.execute(
-            """
-            DELETE FROM usage_categories
-            WHERE user_id = $1
-              AND date = ANY($2::date[])
-              AND idempotency_key NOT LIKE 'dev%'
-            """,
-            user_id, dates,
         )
 
     stored = len(usage_rows)
