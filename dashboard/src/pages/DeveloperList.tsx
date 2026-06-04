@@ -114,9 +114,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const [data, setData] = useState<DevDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [breakdownExpanded, setBreakdownExpanded] = useState(false)
+  const [modelsExpanded, setModelsExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null); setBreakdownExpanded(false)
+    setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -461,17 +462,39 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Models Used</div>
                 {modelTotals.length === 0 ? <p className="no-data">No model data yet</p> : (
-                  modelTotals.map(m => (
-                    <div className="drawer-bar-row" key={m.model}>
-                      <span className="drawer-bar-label wide">{m.model}</span>
-                      <div className="drawer-bar-track">
-                        <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
+                  <>
+                    {(modelsExpanded ? modelTotals : modelTotals.slice(0, 5)).map(m => (
+                      <div className="drawer-bar-row" key={m.model}>
+                        <span className="drawer-bar-label wide">{m.model}</span>
+                        <div className="drawer-bar-track">
+                          <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
+                        </div>
+                        <span className="drawer-bar-val">
+                          {m.sessions} sessions{m.cost > 0 ? ' · ' + formatCost(m.cost) : ' · —'}
+                        </span>
                       </div>
-                      <span className="drawer-bar-val">
-                        {m.sessions} sessions{m.cost > 0 ? ' · ' + formatCost(m.cost) : ' · —'}
-                      </span>
-                    </div>
-                  ))
+                    ))}
+                    {modelTotals.length > 5 && (
+                      <button
+                        onClick={() => setModelsExpanded(!modelsExpanded)}
+                        style={{
+                          width:        '100%',
+                          marginTop:    '8px',
+                          padding:      '8px',
+                          background:   'transparent',
+                          border:       '1px solid var(--gray-200)',
+                          borderRadius: '6px',
+                          fontSize:     '12px',
+                          color:        'var(--gray-500)',
+                          cursor:       'pointer',
+                        }}
+                      >
+                        {modelsExpanded
+                          ? '▲ Show less'
+                          : `▼ View all ${modelTotals.length} models`}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
