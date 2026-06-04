@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 
 export interface InstallResult {
   ok: boolean;
@@ -98,16 +98,18 @@ export function isMacInstalled(): boolean {
   return fs.existsSync(MAC_PLIST);
 }
 
-// ── Windows — Task Scheduler ───────────────────────────────────────────────────
+// ── Windows — Registry Run key (no admin required) ────────────────────────────
+// HKCU\...\Run entries start at user login without elevated privileges.
+// schtasks /sc onlogon requires admin on Windows 11 — that's why we use reg.
 
-const WIN_TASK   = 'AIOps Agent';
-const WIN_VBS    = path.join(os.homedir(), '.aiops', 'start-daemon.vbs');
+const WIN_REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+const WIN_REG_VAL = 'AIOps Agent';
+const WIN_VBS     = path.join(os.homedir(), '.aiops', 'start-daemon.vbs');
 
 function installWindows(): InstallResult {
   const { exec, script } = executorArgs();
-  const logFile = path.join(os.homedir(), '.aiops', 'daemon.log');
 
-  // Write a VBScript wrapper that starts node hidden (no console window)
+  // VBScript hidden launcher — runs node with no console window (0 = hidden)
   const vbs = `Set WshShell = CreateObject("WScript.Shell")
 WshShell.Run Chr(34) & "${exec.replace(/\\/g, '\\\\')}" & Chr(34) & " " & Chr(34) & "${script.replace(/\\/g, '\\\\')}" & Chr(34) & " daemon", 0, False
 `;
@@ -115,41 +117,48 @@ WshShell.Run Chr(34) & "${exec.replace(/\\/g, '\\\\')}" & Chr(34) & " " & Chr(34
     fs.mkdirSync(path.dirname(WIN_VBS), { recursive: true });
     fs.writeFileSync(WIN_VBS, vbs, 'utf8');
   } catch (err) {
-    return { ok: false, message: `Failed to write VBS wrapper: ${(err as Error).message}`, method: 'schtasks' };
+    return { ok: false, message: `Failed to write launcher: ${(err as Error).message}`, method: 'registry' };
   }
 
-  // Delete existing task first (ignore failure)
-  try { execSync(`schtasks /delete /f /tn "${WIN_TASK}"`, { stdio: 'pipe', shell: true }); } catch {}
-
-  const taskCmd = `schtasks /create /f /tn "${WIN_TASK}" /tr "wscript.exe \\"${WIN_VBS}\\"" /sc onlogon /rl limited /delay 0000:30`;
+  // Write to HKCU Run — no admin needed, runs at every login
+  const regValue = `wscript.exe "${WIN_VBS}"`;
+  const regCmd = `reg add "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /t REG_SZ /d "${regValue}" /f`;
   try {
-    execSync(taskCmd, { stdio: 'pipe', shell: true });
-    // Start it immediately (don't wait for next login)
-    try { execSync(`schtasks /run /tn "${WIN_TASK}"`, { stdio: 'pipe', shell: true }); } catch {}
-    return { ok: true, message: `Registered in Task Scheduler ("${WIN_TASK}")`, method: 'schtasks' };
+    execSync(regCmd, { stdio: 'pipe', shell: true });
   } catch (err) {
-    return { ok: false, message: `Windows install failed: ${(err as Error).message}`, method: 'schtasks' };
+    return { ok: false, message: `Registry write failed: ${(err as Error).message}`, method: 'registry' };
   }
+
+  // Start the daemon right now without waiting for next login
+  try {
+    const child = spawn(exec, [script, 'daemon'], {
+      detached: true,
+      stdio:    'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+  } catch { /* non-fatal — daemon will start at next login */ }
+
+  return { ok: true, message: `Registered in Registry Run key ("${WIN_REG_VAL}")`, method: 'registry' };
 }
 
 function uninstallWindows(): InstallResult {
   const errors: string[] = [];
-  try { execSync(`schtasks /end /tn "${WIN_TASK}"`, { stdio: 'pipe', shell: true }); } catch {}
   try {
-    execSync(`schtasks /delete /f /tn "${WIN_TASK}"`, { stdio: 'pipe', shell: true });
+    execSync(`reg delete "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /f`, { stdio: 'pipe', shell: true });
   } catch (err) {
     errors.push((err as Error).message);
   }
   try { if (fs.existsSync(WIN_VBS)) fs.unlinkSync(WIN_VBS); } catch {}
   if (errors.length) {
-    return { ok: false, message: `Windows uninstall failed: ${errors.join('; ')}`, method: 'schtasks' };
+    return { ok: false, message: `Windows uninstall failed: ${errors.join('; ')}`, method: 'registry' };
   }
-  return { ok: true, message: `Removed Task Scheduler entry ("${WIN_TASK}")`, method: 'schtasks' };
+  return { ok: true, message: `Removed Registry Run entry ("${WIN_REG_VAL}")`, method: 'registry' };
 }
 
 export function isWindowsInstalled(): boolean {
   try {
-    execSync(`schtasks /query /tn "${WIN_TASK}"`, { stdio: 'pipe', shell: true });
+    execSync(`reg query "${WIN_REG_KEY}" /v "${WIN_REG_VAL}"`, { stdio: 'pipe', shell: true });
     return true;
   } catch { return false; }
 }

@@ -15469,11 +15469,11 @@ function uninstallMac() {
 function isMacInstalled() {
   return import_fs16.default.existsSync(MAC_PLIST);
 }
-var WIN_TASK = "AIOps Agent";
+var WIN_REG_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+var WIN_REG_VAL = "AIOps Agent";
 var WIN_VBS = import_path13.default.join(import_os7.default.homedir(), ".aiops", "start-daemon.vbs");
 function installWindows() {
   const { exec, script } = executorArgs();
-  const logFile = import_path13.default.join(import_os7.default.homedir(), ".aiops", "daemon.log");
   const vbs = `Set WshShell = CreateObject("WScript.Shell")
 WshShell.Run Chr(34) & "${exec.replace(/\\/g, "\\\\")}" & Chr(34) & " " & Chr(34) & "${script.replace(/\\/g, "\\\\")}" & Chr(34) & " daemon", 0, False
 `;
@@ -15481,32 +15481,30 @@ WshShell.Run Chr(34) & "${exec.replace(/\\/g, "\\\\")}" & Chr(34) & " " & Chr(34
     import_fs16.default.mkdirSync(import_path13.default.dirname(WIN_VBS), { recursive: true });
     import_fs16.default.writeFileSync(WIN_VBS, vbs, "utf8");
   } catch (err) {
-    return { ok: false, message: `Failed to write VBS wrapper: ${err.message}`, method: "schtasks" };
+    return { ok: false, message: `Failed to write launcher: ${err.message}`, method: "registry" };
+  }
+  const regValue = `wscript.exe "${WIN_VBS}"`;
+  const regCmd = `reg add "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /t REG_SZ /d "${regValue}" /f`;
+  try {
+    (0, import_child_process.execSync)(regCmd, { stdio: "pipe", shell: true });
+  } catch (err) {
+    return { ok: false, message: `Registry write failed: ${err.message}`, method: "registry" };
   }
   try {
-    (0, import_child_process.execSync)(`schtasks /delete /f /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
+    const child = (0, import_child_process.spawn)(exec, [script, "daemon"], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true
+    });
+    child.unref();
   } catch {
   }
-  const taskCmd = `schtasks /create /f /tn "${WIN_TASK}" /tr "wscript.exe \\"${WIN_VBS}\\"" /sc onlogon /rl limited /delay 0000:30`;
-  try {
-    (0, import_child_process.execSync)(taskCmd, { stdio: "pipe", shell: true });
-    try {
-      (0, import_child_process.execSync)(`schtasks /run /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
-    } catch {
-    }
-    return { ok: true, message: `Registered in Task Scheduler ("${WIN_TASK}")`, method: "schtasks" };
-  } catch (err) {
-    return { ok: false, message: `Windows install failed: ${err.message}`, method: "schtasks" };
-  }
+  return { ok: true, message: `Registered in Registry Run key ("${WIN_REG_VAL}")`, method: "registry" };
 }
 function uninstallWindows() {
   const errors = [];
   try {
-    (0, import_child_process.execSync)(`schtasks /end /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
-  } catch {
-  }
-  try {
-    (0, import_child_process.execSync)(`schtasks /delete /f /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
+    (0, import_child_process.execSync)(`reg delete "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /f`, { stdio: "pipe", shell: true });
   } catch (err) {
     errors.push(err.message);
   }
@@ -15515,13 +15513,13 @@ function uninstallWindows() {
   } catch {
   }
   if (errors.length) {
-    return { ok: false, message: `Windows uninstall failed: ${errors.join("; ")}`, method: "schtasks" };
+    return { ok: false, message: `Windows uninstall failed: ${errors.join("; ")}`, method: "registry" };
   }
-  return { ok: true, message: `Removed Task Scheduler entry ("${WIN_TASK}")`, method: "schtasks" };
+  return { ok: true, message: `Removed Registry Run entry ("${WIN_REG_VAL}")`, method: "registry" };
 }
 function isWindowsInstalled() {
   try {
-    (0, import_child_process.execSync)(`schtasks /query /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
+    (0, import_child_process.execSync)(`reg query "${WIN_REG_KEY}" /v "${WIN_REG_VAL}"`, { stdio: "pipe", shell: true });
     return true;
   } catch {
     return false;
