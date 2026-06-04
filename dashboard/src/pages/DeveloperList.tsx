@@ -42,6 +42,10 @@ function displayToolName(tool: string): string {
   return TOOL_DISPLAY_NAMES[tool.toLowerCase()] ?? tool
 }
 
+function formatCategory(cat: string): string {
+  return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function normalizeCategories(
   cats: { category: string; session_count: number; pct: number }[]
 ): { category: string; session_count: number; pct: number }[] {
@@ -288,7 +292,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{c.category}</span>
+                          <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{formatCategory(c.category)}</span>
                         </div>
                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
                       </div>

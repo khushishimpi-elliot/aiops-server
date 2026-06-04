@@ -23,6 +23,10 @@ function displayToolName(tool: string): string {
   return TOOL_DISPLAY_NAMES[tool.toLowerCase()] ?? tool
 }
 
+function formatCategory(cat: string): string {
+  return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function nameFromEmail(email: string): string {
   const local = email.split('@')[0]
   return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
@@ -455,7 +459,7 @@ export default function OrgOverview() {
                             <div className="cat-meta">
                               <div className="cat-label-wrap">
                                 <div className="cat-dot" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />
-                                {c.category}
+                                {formatCategory(c.category)}
                               </div>
                               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                                 <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>{c.session_count} sessions</span>
@@ -506,7 +510,7 @@ export default function OrgOverview() {
                                 {otherSubs.map(sub => (
                                   <div key={sub.category} style={{ marginBottom: 8 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                                      <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>{sub.category}</span>
+                                      <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCategory(sub.category)}</span>
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>{sub.session_count} sessions</span>
                                         <span style={{ fontSize: 11, color: 'var(--gray-500)', fontWeight: 600 }}>{sub.pct}%</span>
