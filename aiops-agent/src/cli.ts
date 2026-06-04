@@ -17,6 +17,10 @@ import { syncToServer } from './core/syncer.js';
 
 const VERSION = '1.0.0';
 
+// Sync window covering the entire local history. Old days are safe to
+// re-send: the server upserts by (date, tool, model, category).
+const FULL_HISTORY_DAYS = 3650;
+
 // ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
 
 function fmtTokens(n: number): string {
@@ -1082,7 +1086,10 @@ async function cmdStart(): Promise<void> {
   if (enrolled) {
     try {
       console.log(chalk.white('  Syncing data to company server...'));
-      const result = await syncToServer(28, false);
+      // Send the FULL local history (not just 28 days) so the server matches
+      // the local session count — the server upserts cumulatively, so
+      // re-sending old days is safe and idempotent.
+      const result = await syncToServer(FULL_HISTORY_DAYS, false);
       if (result.success) {
         syncOk = true;
         console.log(chalk.green('  ✅ Data synced to server'));
@@ -1159,6 +1166,42 @@ async function cmdStart(): Promise<void> {
   console.log();
 }
 
+// ─── WATCH COMMAND (continuous scan + sync) ──────────────────────────────────
+
+async function watchTick(): Promise<void> {
+  const ts = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  try {
+    openDb();
+    const liveSessions = runAllAdapters().flatMap(r => r.sessions);
+    if (liveSessions.length) upsertSessions(liveSessions);
+    const total = dbAvailable() ? getDbStats().totalRows : liveSessions.length;
+
+    if (isEnrolled()) {
+      const result = await syncToServer(FULL_HISTORY_DAYS, false);
+      if (result.success) {
+        console.log(chalk.gray(`  [${ts}] `) + chalk.green('✓') + chalk.white(` ${total} sessions — synced ${result.aggregatesSent} aggregates (${result.daysIncluded} days)`));
+      } else {
+        console.log(chalk.gray(`  [${ts}] `) + chalk.yellow('⚠') + chalk.white(` ${total} sessions — sync failed: ${result.error ?? 'unknown'}`));
+      }
+    } else {
+      console.log(chalk.gray(`  [${ts}] `) + chalk.white(`${total} sessions saved locally`) + chalk.dim(' (not enrolled — no sync)'));
+    }
+  } catch (err) {
+    console.log(chalk.gray(`  [${ts}] `) + chalk.yellow('⚠ tick failed: ' + (err as Error).message));
+  }
+}
+
+async function cmdWatch(opts: { interval?: string }): Promise<void> {
+  const minutes = Math.max(1, parseInt(opts.interval ?? '5') || 5);
+  console.log();
+  console.log(`  ${chalk.bold.cyan('AIOps Watch')}  ${chalk.gray('v' + VERSION)}`);
+  console.log(chalk.dim(`  Scanning + syncing every ${minutes} min. Press Ctrl+C to stop.`));
+  console.log();
+
+  await watchTick();
+  setInterval(() => { void watchTick(); }, minutes * 60_000);
+}
+
 // ─── CLI SETUP ────────────────────────────────────────────────────────────────
 
 program.name('aiops').version(VERSION).description('Monitor AI coding tool usage and costs');
@@ -1166,6 +1209,11 @@ program.name('aiops').version(VERSION).description('Monitor AI coding tool usage
 program.command('start')
   .description('Scan, save and sync everything (recommended)')
   .action(() => cmdStart());
+
+program.command('watch')
+  .description('Keep scanning and syncing to the server continuously (real-time mode)')
+  .option('-i, --interval <minutes>', 'minutes between scans', '5')
+  .action((opts: { interval?: string }) => cmdWatch(opts));
 
 program.command('scan')
   .description('Scan AI tools on this machine')
@@ -1383,7 +1431,7 @@ program
 program
   .command('sync')
   .description('Send data to company server')
-  .option('--days <n>', 'How many days of data to send', '30')
+  .option('--days <n>', 'How many days of data to send (default: full history)', String(FULL_HISTORY_DAYS))
   .option('--dry-run', 'Preview what would be sent without sending')
   .action(async (opts: { days?: string; dryRun?: boolean }) => {
     if (!isEnrolled()) {
@@ -1392,7 +1440,7 @@ program
       return;
     }
 
-    const days   = parseInt(opts.days ?? '1') || 1;
+    const days   = parseInt(opts.days ?? String(FULL_HISTORY_DAYS)) || FULL_HISTORY_DAYS;
     const dryRun = !!opts.dryRun;
 
     // Refresh the local DB with the latest live session data so sync is

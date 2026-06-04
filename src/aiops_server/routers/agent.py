@@ -3,7 +3,6 @@ import secrets
 from datetime import date as date_type
 
 import asyncpg
-from asyncpg.exceptions import UniqueViolationError
 from fastapi import APIRouter, Depends, Header
 
 from ..config import Config, get_config
@@ -135,7 +134,9 @@ async def agent_sync(
 
     device_id: int = device["id"]
     user_id: int = device["user_id"]
-    stored = 0
+
+    usage_rows: list[tuple] = []
+    category_rows: list[tuple] = []
 
     for agg in body.aggregates:
         parsed_date = date_type.fromisoformat(agg.date)
@@ -147,39 +148,59 @@ async def agent_sync(
             f"{token_hash}:{agg.date}:{agg.tool}:{agg.model}:{agg.category or ''}".encode()
         ).hexdigest()[:64]
 
-        try:
-            await conn.execute(
-                """
-                INSERT INTO usage(
-                    user_id, device_id, date, tool, model,
-                    input_tokens, output_tokens,
-                    cache_read_tokens, cache_write_tokens,
-                    cost_millicents, idempotency_key
-                )
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-                ON CONFLICT (idempotency_key) DO NOTHING
-                """,
-                user_id, device_id, parsed_date,
-                agg.tool, agg.model,
-                agg.input_tokens, agg.output_tokens,
-                cache_read, cache_write,
-                cost_millicents, ikey,
-            )
-            stored += 1
-        except UniqueViolationError:
-            pass
+        usage_rows.append((
+            user_id, device_id, parsed_date,
+            agg.tool, agg.model,
+            agg.input_tokens, agg.output_tokens,
+            cache_read, cache_write,
+            cost_millicents, agg.sessions, ikey,
+        ))
 
         if agg.category:
             cat_ikey = hashlib.sha256(f"{ikey}:cat".encode()).hexdigest()[:64]
-            await conn.execute(
+            category_rows.append((
+                user_id, device_id, parsed_date,
+                agg.category, agg.sessions, cat_ikey,
+            ))
+
+    # The agent sends CUMULATIVE daily totals recomputed from its full local
+    # DB on every sync, so a conflict means "newer totals for the same day" —
+    # overwrite, never drop (DO NOTHING froze the dashboard at the first-sync
+    # snapshot). Batched: per-row round-trips made large rollups take >20s.
+    async with conn.transaction():
+        await conn.executemany(
+            """
+            INSERT INTO usage(
+                user_id, device_id, date, tool, model,
+                input_tokens, output_tokens,
+                cache_read_tokens, cache_write_tokens,
+                cost_millicents, session_count, idempotency_key
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            ON CONFLICT (idempotency_key) DO UPDATE SET
+                input_tokens       = EXCLUDED.input_tokens,
+                output_tokens      = EXCLUDED.output_tokens,
+                cache_read_tokens  = EXCLUDED.cache_read_tokens,
+                cache_write_tokens = EXCLUDED.cache_write_tokens,
+                cost_millicents    = EXCLUDED.cost_millicents,
+                session_count      = EXCLUDED.session_count,
+                recorded_at        = now()
+            """,
+            usage_rows,
+        )
+
+        if category_rows:
+            await conn.executemany(
                 """
                 INSERT INTO usage_categories(user_id, device_id, date, category, session_count, idempotency_key)
                 VALUES ($1, $2, $3, $4, $5, $6)
-                ON CONFLICT (idempotency_key) DO NOTHING
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    session_count = EXCLUDED.session_count
                 """,
-                user_id, device_id, parsed_date,
-                agg.category, agg.sessions, cat_ikey,
+                category_rows,
             )
+
+    stored = len(usage_rows)
 
     await conn.execute(
         "UPDATE devices SET last_seen_at = now() WHERE id = $1",
