@@ -7,12 +7,12 @@ const DEV_COLORS = ['#FF6600','#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899']
 const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#6b7280']
 
 const ALL_TOOLS = [
-  'claude','copilot','cursor','gemini','windsurf','cline',
+  'claude_code','copilot','cursor','gemini','windsurf','cline',
   'roo','kilo','codex','pi',
 ]
 
 const TOOL_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  claude:      { bg: '#fff3ec', color: '#FF6600',  label: 'Claude Code' },
+  claude_code: { bg: '#fff3ec', color: '#FF6600',  label: 'Claude Code' },
   copilot:     { bg: '#f1f5f9', color: '#374151',  label: 'Copilot' },
   cursor:      { bg: '#eef2ff', color: '#6366f1',  label: 'Cursor' },
   gemini:      { bg: '#eff6ff', color: '#3b82f6',  label: 'Gemini' },
@@ -24,42 +24,32 @@ const TOOL_BADGE: Record<string, { bg: string; color: string; label: string }> =
   pi:          { bg: '#f8fafc', color: '#475569',  label: 'Pi' },
 }
 
-function nameFromEmail(email: string): string {
-  const local = email.split('@')[0]
-  return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
-}
-
-function avatarLetter(email: string): string {
-  return email.charAt(0).toUpperCase()
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  claude_code: 'Claude Code',
+  claude:      'Claude Code',
+  copilot:     'GitHub Copilot',
+  gemini:      'Gemini CLI',
+  cursor:      'Cursor',
+  windsurf:    'Windsurf',
+  cline:       'Cline',
+  roo:         'Roo Code',
+  kilo:        'Kilo Code',
+  codex:       'Codex',
+  pi:          'Pi',
 }
 
 function displayToolName(tool: string): string {
-  return TOOL_BADGE[tool.toLowerCase()]?.label ?? tool
-}
-
-function formatCategory(category: string): string {
-  return category
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase())
-}
-
-interface NormalizedCategory {
-  category: string
-  session_count: number
-  pct: number
-  others?: { category: string; session_count: number }[]
+  return TOOL_DISPLAY_NAMES[tool.toLowerCase()] ?? tool
 }
 
 function normalizeCategories(
   cats: { category: string; session_count: number; pct: number }[]
-): NormalizedCategory[] {
+): { category: string; session_count: number; pct: number }[] {
   const MAIN = [
     'code_generation',
     'testing',
     'configuration',
     'debugging',
-    'automation',
-    'research',
   ]
 
   const normalized: Record<string, number> = {
@@ -67,11 +57,8 @@ function normalizeCategories(
     testing:         0,
     configuration:   0,
     debugging:       0,
-    automation:      0,
-    research:        0,
     other:           0,
   }
-  const otherItems: { category: string; session_count: number }[] = []
 
   for (const c of cats) {
     const key = c.category.toLowerCase().trim()
@@ -79,7 +66,6 @@ function normalizeCategories(
       normalized[key] += c.session_count
     } else {
       normalized['other'] += c.session_count
-      otherItems.push({ category: c.category, session_count: c.session_count })
     }
   }
 
@@ -92,11 +78,17 @@ function normalizeCategories(
       category,
       session_count,
       pct: Math.round((session_count / total) * 100),
-      ...(category === 'other'
-        ? { others: [...otherItems].sort((a, b) => b.session_count - a.session_count) }
-        : {}),
     }))
     .sort((a, b) => b.session_count - a.session_count)
+}
+
+function nameFromEmail(email: string): string {
+  const local = email.split('@')[0]
+  return local.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
+}
+
+function avatarLetter(email: string): string {
+  return email.charAt(0).toUpperCase()
 }
 
 function isActive(lastActive: string | null): boolean {
@@ -104,40 +96,9 @@ function isActive(lastActive: string | null): boolean {
   return Date.now() - new Date(lastActive).getTime() < 7 * 24 * 60 * 60 * 1000
 }
 
+
 const WEEKLY_BUDGET_MC  = 15_000 * 100
 const MONTHLY_BUDGET_MC = 50_000 * 100
-
-function ExpandToggle({ expanded, onToggle, collapsedLabel }: {
-  expanded: boolean; onToggle: () => void; collapsedLabel: string
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      style={{
-        width:        '100%',
-        marginTop:    '8px',
-        padding:      '8px',
-        background:   'transparent',
-        border:       '1px solid var(--gray-200)',
-        borderRadius: '6px',
-        fontSize:     '12px',
-        color:        'var(--gray-500)',
-        cursor:       'pointer',
-        transition:   'all 0.15s',
-      }}
-      onMouseEnter={e => {
-        (e.target as HTMLButtonElement).style.background = 'var(--gray-50)'
-        ;(e.target as HTMLButtonElement).style.color = 'var(--brand)'
-      }}
-      onMouseLeave={e => {
-        (e.target as HTMLButtonElement).style.background = 'transparent'
-        ;(e.target as HTMLButtonElement).style.color = 'var(--gray-500)'
-      }}
-    >
-      {expanded ? '▲ Show less' : collapsedLabel}
-    </button>
-  )
-}
 
 function DevDrawer({ email, colorIdx, days, onClose }: {
   email: string; colorIdx: number; days: number; onClose: () => void
@@ -145,11 +106,9 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const [data, setData] = useState<DevDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [breakdownExpanded, setBreakdownExpanded] = useState(false)
-  const [othersExpanded, setOthersExpanded] = useState(false)
-  const [modelsExpanded, setModelsExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null); setBreakdownExpanded(false); setOthersExpanded(false); setModelsExpanded(false)
+    setLoading(true); setData(null); setBreakdownExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -320,111 +279,94 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               {data.task_categories.length > 0 && (
                 <div className="drawer-section">
                   <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
-                  {normalizeCategories(data.task_categories || []).map((c, i) => {
-                    const hasOthers = c.category === 'other' && !!c.others && c.others.length > 0
-                    return (
-                      <div key={c.category} style={{ marginBottom: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <div
-                            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: hasOthers ? 'pointer' : 'default', userSelect: 'none' }}
-                            onClick={hasOthers ? () => setOthersExpanded(v => !v) : undefined}
-                          >
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{formatCategory(c.category)}</span>
-                            {hasOthers && (
-                              <span style={{ fontSize: 9, color: 'var(--gray-400)' }}>
-                                {othersExpanded ? '▲' : '▼'} ({c.others!.length})
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
+                  {normalizeCategories(data.task_categories || []).map((c, i) => (
+                    <div key={c.category} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{c.category}</span>
                         </div>
-                        <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
-                          <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
-                        </div>
-                        {hasOthers && othersExpanded && (
-                          <div style={{ marginTop: 6, marginLeft: 16, paddingLeft: 10, borderLeft: '1px solid var(--gray-200)' }}>
-                            {c.others!.map(o => (
-                              <div key={o.category} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--gray-500)', padding: '2px 0' }}>
-                                <span>{formatCategory(o.category)}</span>
-                                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{o.session_count} sessions</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
                       </div>
-                    )
-                  })}
+                      <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
+                        <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
               {/* Daily Breakdown */}
               <div className="drawer-section">
-                <div className="drawer-section-title">
-                  <span className="dsicon">◆</span> Daily Breakdown
-                </div>
+                <div className="drawer-section-title"><span className="dsicon">◆</span> Daily Breakdown</div>
                 {data.by_tool_model.length === 0 ? (
                   <p className="no-data">No data</p>
                 ) : (
-                  <>
-                    <table className="drawer-table">
-                      <thead>
-                        <tr>
-                          <th>Tool</th>
-                          <th>Model</th>
-                          <th>Sessions</th>
-                          <th>Cost</th>
-                          <th>Tokens</th>
+                  <table className="drawer-table">
+                    <thead>
+                      <tr><th>Tool</th><th>Model</th><th>Sessions</th><th>Cost</th><th>Tokens</th></tr>
+                    </thead>
+                    <tbody>
+                      {(breakdownExpanded
+                        ? [...data.by_tool_model]
+                            .sort((a,b) =>
+                              b.cost_millicents - a.cost_millicents
+                            )
+                        : [...data.by_tool_model]
+                            .sort((a,b) =>
+                              b.cost_millicents - a.cost_millicents
+                            )
+                            .slice(0, 5)
+                      ).map((row, i) => (
+                        <tr key={i}>
+                          <td>
+                            <span className={
+                              row.tool === 'claude_code' ||
+                              row.tool === 'claude'
+                                ? 'dtag orange'
+                                : 'dtag'
+                            }>
+                              {displayToolName(row.tool)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="dtag">{row.model}</span>
+                          </td>
+                          <td>{row.session_count ?? row.days_active}</td>
+                          <td className="cost-cell">
+                            {formatCost(row.cost_millicents)}
+                          </td>
+                          <td>
+                            {formatTokens(
+                              row.input_tokens + row.output_tokens
+                            )}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {(breakdownExpanded
-                          ? [...data.by_tool_model]
-                              .sort((a, b) =>
-                                b.cost_millicents - a.cost_millicents
-                              )
-                          : [...data.by_tool_model]
-                              .sort((a, b) =>
-                                b.cost_millicents - a.cost_millicents
-                              )
-                              .slice(0, 5)
-                        ).map((row, i) => (
-                          <tr key={i}>
-                            <td>
-                              <span className={
-                                row.tool === 'claude_code' ||
-                                row.tool === 'claude'
-                                  ? 'dtag orange'
-                                  : 'dtag'
-                              }>
-                                {displayToolName(row.tool)}
-                              </span>
-                            </td>
-                            <td>
-                              <span className="dtag">{row.model}</span>
-                            </td>
-                            <td>{row.session_count ?? row.days_active}</td>
-                            <td className="cost-cell">
-                              {formatCost(row.cost_millicents)}
-                            </td>
-                            <td>
-                              {formatTokens(
-                                row.input_tokens + row.output_tokens
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {data.by_tool_model.length > 5 && (
-                      <ExpandToggle
-                        expanded={breakdownExpanded}
-                        onToggle={() => setBreakdownExpanded(!breakdownExpanded)}
-                        collapsedLabel={`▼ View all ${data.by_tool_model.length} entries`}
-                      />
-                    )}
-                  </>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {data.by_tool_model.length > 5 && (
+                  <button
+                    onClick={() =>
+                      setBreakdownExpanded(!breakdownExpanded)
+                    }
+                    style={{
+                      width:        '100%',
+                      marginTop:    '8px',
+                      padding:      '8px',
+                      background:   'transparent',
+                      border:       '1px solid var(--gray-200)',
+                      borderRadius: '6px',
+                      fontSize:     '12px',
+                      color:        'var(--gray-500)',
+                      cursor:       'pointer',
+                    }}
+                  >
+                    {breakdownExpanded
+                      ? '▲ Show less'
+                      : `▼ View all ${data.by_tool_model.length} rows`}
+                  </button>
                 )}
               </div>
 
@@ -487,15 +429,15 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                   const maxCost = Math.max(...bars.map(d => d.cost_millicents), 1);
                   const CHART_H = 120;
                   return (
-                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${bars.length}, 1fr)`, gap: 4, height: CHART_H + 36, alignItems: 'end' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: CHART_H + 36, padding: '0 0' }}>
                       {bars.map(d => {
                         const barH = Math.max(4, Math.round((d.cost_millicents / maxCost) * CHART_H));
                         return (
-                          <div key={d.date} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%', justifyContent: 'flex-end' }}>
+                          <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%', justifyContent: 'flex-end' }}>
                             <span style={{ fontSize: 8, color: 'var(--gray-400)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                               {formatCost(d.cost_millicents)}
                             </span>
-                            <div style={{ width: 14, height: barH, background: 'var(--brand)', borderRadius: '3px 3px 0 0' }} />
+                            <div style={{ width: '50%', maxWidth: 20, minWidth: 8, height: barH, background: 'var(--brand)', borderRadius: '3px 3px 0 0' }} />
                             <span style={{ fontSize: 8, color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>
                               {d.date.slice(5)}
                             </span>
@@ -511,26 +453,17 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Models Used</div>
                 {modelTotals.length === 0 ? <p className="no-data">No model data yet</p> : (
-                  <>
-                    {(modelsExpanded ? modelTotals : modelTotals.slice(0, 5)).map(m => (
-                      <div className="drawer-bar-row" key={m.model}>
-                        <span className="drawer-bar-label wide">{m.model}</span>
-                        <div className="drawer-bar-track">
-                          <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
-                        </div>
-                        <span className="drawer-bar-val">
-                          {m.sessions} sessions{m.cost > 0 ? ' · ' + formatCost(m.cost) : ' · —'}
-                        </span>
+                  modelTotals.map(m => (
+                    <div className="drawer-bar-row" key={m.model}>
+                      <span className="drawer-bar-label wide">{m.model}</span>
+                      <div className="drawer-bar-track">
+                        <div className="drawer-bar-fill" style={{ width: `${m.pct}%` }} />
                       </div>
-                    ))}
-                    {modelTotals.length > 5 && (
-                      <ExpandToggle
-                        expanded={modelsExpanded}
-                        onToggle={() => setModelsExpanded(!modelsExpanded)}
-                        collapsedLabel={`▼ View all ${modelTotals.length} models`}
-                      />
-                    )}
-                  </>
+                      <span className="drawer-bar-val">
+                        {m.sessions} sessions{m.cost > 0 ? ' · ' + formatCost(m.cost) : ' · —'}
+                      </span>
+                    </div>
+                  ))
                 )}
               </div>
 
