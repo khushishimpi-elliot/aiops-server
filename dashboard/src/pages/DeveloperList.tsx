@@ -87,7 +87,11 @@ function normalizeCategories(
       session_count,
       pct: Math.round((session_count / total) * 100),
     }))
-    .sort((a, b) => b.session_count - a.session_count)
+    .sort((a, b) => {
+      if (a.category === 'other') return 1
+      if (b.category === 'other') return -1
+      return b.session_count - a.session_count
+    })
 }
 
 function nameFromEmail(email: string): string {
@@ -115,9 +119,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const [loading, setLoading] = useState(true)
   const [breakdownExpanded, setBreakdownExpanded] = useState(false)
   const [modelsExpanded, setModelsExpanded] = useState(false)
+  const [otherCatsExpanded, setOtherCatsExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false)
+    setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false); setOtherCatsExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -285,25 +290,85 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               </div>
 
               {/* Tasks AI Used For */}
-              {data.task_categories.length > 0 && (
-                <div className="drawer-section">
-                  <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
-                  {normalizeCategories(data.task_categories || []).map((c, i) => (
-                    <div key={c.category} style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{formatCategory(c.category)}</span>
+              {data.task_categories.length > 0 && (() => {
+                const MAIN = ['code_generation','testing','configuration','debugging','automation','research']
+                const normalized = normalizeCategories(data.task_categories || [])
+                const mainCats = normalized.filter(c => c.category !== 'other')
+                const otherEntry = normalized.find(c => c.category === 'other')
+                const otherSubs = (data.task_categories || [])
+                  .filter(c => !MAIN.includes(c.category.toLowerCase().trim()))
+                  .sort((a, b) => b.session_count - a.session_count)
+                return (
+                  <div className="drawer-section">
+                    <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
+                    {mainCats.map((c, i) => (
+                      <div key={c.category} style={{ marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{formatCategory(c.category)}</span>
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
+                        <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
+                          <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
+                        </div>
                       </div>
-                      <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
-                        <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
+                    ))}
+                    {otherEntry && otherSubs.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[5], flexShrink: 0 }} />
+                            <button
+                              onClick={() => setOtherCatsExpanded(!otherCatsExpanded)}
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                padding: 0, display: 'flex', alignItems: 'center', gap: 4,
+                                fontSize: 12, color: 'var(--gray-700)', fontWeight: 500,
+                              }}
+                            >
+                              Other
+                              <span style={{
+                                fontSize: 10, color: 'var(--gray-500)',
+                                background: 'var(--gray-100)', borderRadius: 4,
+                                padding: '1px 5px', fontWeight: 600,
+                              }}>
+                                {otherSubs.length}
+                              </span>
+                              <span style={{ fontSize: 9, color: 'var(--gray-400)' }}>
+                                {otherCatsExpanded ? '▲' : '▼'}
+                              </span>
+                            </button>
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{otherEntry.pct}%</span>
+                        </div>
+                        <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
+                          <div style={{ height: '100%', width: `${otherEntry.pct}%`, background: CAT_COLORS[5], borderRadius: 2 }} />
+                        </div>
+                        {otherCatsExpanded && (
+                          <div style={{ marginTop: 8, paddingLeft: 14, borderLeft: '2px solid var(--gray-100)' }}>
+                            {otherSubs.map(sub => (
+                              <div key={sub.category} style={{ marginBottom: 8 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                                  <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCategory(sub.category)}</span>
+                                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>{sub.session_count} sessions</span>
+                                    <span style={{ fontSize: 11, color: 'var(--gray-500)', fontWeight: 600 }}>{sub.pct}%</span>
+                                  </div>
+                                </div>
+                                <div style={{ height: 3, background: 'var(--gray-100)', borderRadius: 2 }}>
+                                  <div style={{ height: '100%', width: `${sub.pct}%`, background: CAT_COLORS[5], borderRadius: 2 }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Daily Breakdown */}
               <div className="drawer-section">
