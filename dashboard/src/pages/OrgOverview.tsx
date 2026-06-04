@@ -118,6 +118,8 @@ export default function OrgOverview() {
       'testing',
       'configuration',
       'debugging',
+      'automation',
+      'research',
     ]
 
     const normalized: Record<string, number> = {
@@ -125,6 +127,8 @@ export default function OrgOverview() {
       testing:         0,
       configuration:   0,
       debugging:       0,
+      automation:      0,
+      research:        0,
       other:           0,
     }
 
@@ -437,7 +441,7 @@ export default function OrgOverview() {
                   {data.task_categories.length === 0 ? (
                     <p className="no-data">No category data yet — run <code>python aiops.py report</code></p>
                   ) : (() => {
-                    const MAIN = ['code_generation','testing','configuration','debugging']
+                    const MAIN = ['code_generation','testing','configuration','debugging','automation','research']
                     const normalized = normalizeCategories(data.task_categories)
                     const mainCats = normalized.filter(c => c.category !== 'other')
                     const otherEntry = normalized.find(c => c.category === 'other')
