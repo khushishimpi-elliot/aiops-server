@@ -43,23 +43,33 @@ async def list_developers(
             u.id,
             u.email,
             u.created_at,
-            COALESCE(SUM(us.cost_millicents), 0)::bigint  AS total_cost_millicents,
-            COALESCE(SUM(us.input_tokens),    0)::bigint  AS total_input_tokens,
-            COALESCE(SUM(us.output_tokens),   0)::bigint  AS total_output_tokens,
+            COALESCE(us.total_cost_millicents, 0)::bigint  AS total_cost_millicents,
+            COALESCE(us.total_input_tokens,    0)::bigint  AS total_input_tokens,
+            COALESCE(us.total_output_tokens,   0)::bigint  AS total_output_tokens,
             -- Last active = most recent day the developer actually used the tool
-            -- (usage.date from the Claude logs), NOT when telemetry was uploaded.
+            -- (usage.date from the Claude logs), all-time — independent of the
+            -- selected window.
             (SELECT MAX(us2.date) FROM usage us2 WHERE us2.user_id = u.id) AS last_active,
-            COUNT(DISTINCT d.id)
-                FILTER (WHERE d.status = 'active')::int  AS active_devices
+            COALESCE(d.active_devices, 0)::int             AS active_devices
         FROM   users u
-        LEFT JOIN usage us
-               ON us.user_id = u.id
-              AND us.date >= CURRENT_DATE - $1::integer
-        LEFT JOIN devices d ON d.user_id = u.id
+        LEFT JOIN (
+            SELECT user_id,
+                   SUM(cost_millicents)::bigint AS total_cost_millicents,
+                   SUM(input_tokens)::bigint    AS total_input_tokens,
+                   SUM(output_tokens)::bigint   AS total_output_tokens
+            FROM   usage
+            WHERE  date >= CURRENT_DATE - $1::integer
+            GROUP  BY user_id
+        ) us ON us.user_id = u.id
+        LEFT JOIN (
+            SELECT user_id, COUNT(*)::int AS active_devices
+            FROM   devices
+            WHERE  status = 'active'
+            GROUP  BY user_id
+        ) d ON d.user_id = u.id
         WHERE  u.deleted_at IS NULL
-        GROUP  BY u.id, u.email, u.created_at
         ORDER  BY total_cost_millicents DESC
-""",
+        """,
         days,
     )
     return DevSummaryResponse(
