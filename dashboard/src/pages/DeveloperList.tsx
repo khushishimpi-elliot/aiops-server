@@ -120,9 +120,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const [breakdownExpanded, setBreakdownExpanded] = useState(false)
   const [modelsExpanded, setModelsExpanded] = useState(false)
   const [otherCatsExpanded, setOtherCatsExpanded] = useState(false)
+  const [toolsExpanded, setToolsExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false); setOtherCatsExpanded(false)
+    setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false); setOtherCatsExpanded(false); setToolsExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -276,17 +277,45 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               {/* Tools Detected */}
               <div className="drawer-section">
                 <div className="drawer-section-title"><span className="dsicon">◆</span> Tools Detected</div>
-                {toolList.filter(t => t.sessions > 0).map(t => (
-                  <div className="drawer-bar-row" key={t.tool}>
-                    <span className="drawer-bar-label">{TOOL_BADGE[t.tool]?.label ?? t.tool}</span>
-                    <div className="drawer-bar-track">
-                      <div className="drawer-bar-fill" style={{ width: `${Math.round(t.sessions / maxToolSessions * 100)}%` }} />
-                    </div>
-                    <span className="drawer-bar-val">
-                      {t.sessions > 0 ? `${t.sessions} sessions${t.cost > 0 ? ' · ' + formatCost(t.cost) : ''}` : '0 sessions'}
-                    </span>
-                  </div>
-                ))}
+                {(() => {
+                  const activeTools = toolList.filter(t => t.sessions > 0)
+                  const visible = toolsExpanded ? activeTools : activeTools.slice(0, 5)
+                  return (
+                    <>
+                      {visible.map(t => (
+                        <div className="drawer-bar-row" key={t.tool}>
+                          <span className="drawer-bar-label">{TOOL_BADGE[t.tool]?.label ?? t.tool}</span>
+                          <div className="drawer-bar-track">
+                            <div className="drawer-bar-fill" style={{ width: `${Math.round(t.sessions / maxToolSessions * 100)}%` }} />
+                          </div>
+                          <span className="drawer-bar-val">
+                            {t.sessions > 0 ? `${t.sessions} sessions${t.cost > 0 ? ' · ' + formatCost(t.cost) : ''}` : '0 sessions'}
+                          </span>
+                        </div>
+                      ))}
+                      {activeTools.length > 5 && (
+                        <button
+                          onClick={() => setToolsExpanded(!toolsExpanded)}
+                          style={{
+                            width:        '100%',
+                            marginTop:    '8px',
+                            padding:      '8px',
+                            background:   'transparent',
+                            border:       '1px solid var(--gray-200)',
+                            borderRadius: '6px',
+                            fontSize:     '12px',
+                            color:        'var(--gray-500)',
+                            cursor:       'pointer',
+                          }}
+                        >
+                          {toolsExpanded
+                            ? '▲ Show less'
+                            : `▼ View all ${activeTools.length} tools`}
+                        </button>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Tasks AI Used For */}
