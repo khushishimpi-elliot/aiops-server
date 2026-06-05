@@ -63,10 +63,19 @@ def create_app() -> FastAPI:
         class SPAStaticFiles(StaticFiles):
             async def get_response(self, path: str, scope):  # type: ignore[override]
                 try:
-                    return await super().get_response(path, scope)
+                    response = await super().get_response(path, scope)
+                    # Never cache index.html — always fetch fresh so the browser
+                    # picks up the new content-hashed JS/CSS bundle on each deploy.
+                    if path in ("", "index.html") or path.endswith("/"):
+                        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                        response.headers["Pragma"] = "no-cache"
+                    return response
                 except StarletteHTTPException as exc:
                     if exc.status_code == 404:
-                        return await super().get_response("index.html", scope)
+                        response = await super().get_response("index.html", scope)
+                        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                        response.headers["Pragma"] = "no-cache"
+                        return response
                     raise
 
         app.mount("/", SPAStaticFiles(directory=dashboard_path, html=True), name="dashboard")
