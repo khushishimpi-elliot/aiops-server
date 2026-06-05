@@ -16560,17 +16560,23 @@ async function cmdStart() {
   }
   let syncOk = false;
   if (enrolled) {
-    try {
-      console.log(source_default.white("  Syncing data to company server..."));
-      const result = await syncToServer(28, false);
-      if (result.success) {
-        syncOk = true;
-        console.log(source_default.green("  \u2705 Data synced to server"));
-      } else {
+    const daemonRunning = isDaemonAlive();
+    if (daemonRunning) {
+      console.log(source_default.dim("  \u2139 Daemon is running \u2014 sync will happen automatically every 15 min"));
+      syncOk = true;
+    } else {
+      try {
+        console.log(source_default.white("  Syncing data to company server..."));
+        const result = await syncToServer(28, false);
+        if (result.success) {
+          syncOk = true;
+          console.log(source_default.green("  \u2705 Data synced to server"));
+        } else {
+          console.log(source_default.yellow("  \u26A0 Sync failed \u2014 data saved locally, will retry next time"));
+        }
+      } catch {
         console.log(source_default.yellow("  \u26A0 Sync failed \u2014 data saved locally, will retry next time"));
       }
-    } catch {
-      console.log(source_default.yellow("  \u26A0 Sync failed \u2014 data saved locally, will retry next time"));
     }
     console.log();
   } else {

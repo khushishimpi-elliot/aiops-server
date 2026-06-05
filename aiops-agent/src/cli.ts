@@ -1094,17 +1094,23 @@ async function cmdStart(): Promise<void> {
   // ── Step 3: Sync to server ────────────────────────────────────────────────
   let syncOk = false;
   if (enrolled) {
-    try {
-      console.log(chalk.white('  Syncing data to company server...'));
-      const result = await syncToServer(28, false);
-      if (result.success) {
-        syncOk = true;
-        console.log(chalk.green('  ✅ Data synced to server'));
-      } else {
+    const daemonRunning = isDaemonAlive();
+    if (daemonRunning) {
+      console.log(chalk.dim('  ℹ Daemon is running — sync will happen automatically every 15 min'));
+      syncOk = true;
+    } else {
+      try {
+        console.log(chalk.white('  Syncing data to company server...'));
+        const result = await syncToServer(28, false);
+        if (result.success) {
+          syncOk = true;
+          console.log(chalk.green('  ✅ Data synced to server'));
+        } else {
+          console.log(chalk.yellow('  ⚠ Sync failed — data saved locally, will retry next time'));
+        }
+      } catch {
         console.log(chalk.yellow('  ⚠ Sync failed — data saved locally, will retry next time'));
       }
-    } catch {
-      console.log(chalk.yellow('  ⚠ Sync failed — data saved locally, will retry next time'));
     }
     console.log();
   } else {
