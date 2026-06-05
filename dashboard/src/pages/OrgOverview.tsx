@@ -110,15 +110,23 @@ export default function OrgOverview() {
 
   const topBarLabel = `Last ${days} days`
 
-  const MAIN_CATS = ['code_generation', 'debugging', 'configuration', 'testing']
+  const MAIN_CATS = ['code_generation', 'debugging', 'configuration', 'testing', 'automation', 'research']
 
-  // Fixed color map: other=orange, code_generation=blue, debugging=green, configuration=amber, testing=purple
+  // Sub-tasks shown inside the Other dropdown (Title Case for display)
+  const OTHER_SUBCATS = ['analysis', 'code review', 'code_review', 'refactoring', 'documentation', 'architecture', 'agentic', 'writing']
+
   const CAT_COLOR_MAP: Record<string, string> = {
-    other:            '#FF6600',
-    code_generation:  '#3b82f6',
-    debugging:        '#22c55e',
-    configuration:    '#f59e0b',
-    testing:          '#8b5cf6',
+    other:           '#FF6600',
+    code_generation: '#3b82f6',
+    debugging:       '#22c55e',
+    configuration:   '#f59e0b',
+    testing:         '#8b5cf6',
+    automation:      '#ec4899',
+    research:        '#14b8a6',
+  }
+
+  function fmtCat(cat: string): string {
+    return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
   interface NormalizedCategory {
@@ -130,32 +138,37 @@ export default function OrgOverview() {
 
   function normalizeCategories(cats: TaskCategoryItem[]): NormalizedCategory[] {
     const mainCounts: Record<string, number> = {}
-    const otherSubs:  { category: string; session_count: number }[] = []
+    const subCounts:  Record<string, number> = {}
     let otherTotal = 0
 
     for (const c of cats) {
       const key = c.category.toLowerCase().trim()
-      if (MAIN_CATS.includes(key)) {
+      if (key === 'other') {
+        // raw "other" from backend → absorbed into Other total, not shown as sub-item
+        otherTotal += c.session_count
+      } else if (MAIN_CATS.includes(key)) {
         mainCounts[key] = (mainCounts[key] ?? 0) + c.session_count
+      } else if (OTHER_SUBCATS.includes(key)) {
+        subCounts[key] = (subCounts[key] ?? 0) + c.session_count
+        otherTotal += c.session_count
       } else {
-        otherSubs.push({ category: key, session_count: c.session_count })
         otherTotal += c.session_count
       }
     }
 
     const total = [...Object.values(mainCounts), otherTotal].reduce((a, b) => a + b, 0) || 1
-
     const result: NormalizedCategory[] = []
 
-    // other always first
+    // Other always first
     if (otherTotal > 0) {
-      const subs = otherSubs
-        .sort((a, b) => b.session_count - a.session_count)
-        .map(s => ({
-          category:      s.category,
-          session_count: s.session_count,
-          pct:           Math.round((s.session_count / otherTotal) * 100),
+      const subs = OTHER_SUBCATS
+        .filter(k => subCounts[k] > 0)
+        .map(k => ({
+          category:      k,
+          session_count: subCounts[k],
+          pct:           Math.round((subCounts[k] / otherTotal) * 100),
         }))
+        .sort((a, b) => b.session_count - a.session_count)
       result.push({
         category:      'other',
         session_count: otherTotal,
@@ -164,9 +177,9 @@ export default function OrgOverview() {
       })
     }
 
-    // then main cats in fixed order
+    // Then main cats in fixed order
     for (const key of MAIN_CATS) {
-      if (mainCounts[key] && mainCounts[key] > 0) {
+      if (mainCounts[key] > 0) {
         result.push({
           category:      key,
           session_count: mainCounts[key],
@@ -475,7 +488,7 @@ export default function OrgOverview() {
                               <div className="cat-meta">
                                 <div className="cat-label-wrap">
                                   <div className="cat-dot" style={{ background: color }} />
-                                  {c.category}
+                                  {fmtCat(c.category)}
                                   {c.sub && (
                                     <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--gray-400)' }}>
                                       {otherExpanded ? '▲' : '▼'}
@@ -516,7 +529,7 @@ export default function OrgOverview() {
                                     }}
                                   >
                                     <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
-                                      {s.category}
+                                      {fmtCat(s.category)}
                                     </span>
                                     <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>
                                       {s.session_count} sessions

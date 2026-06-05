@@ -56,13 +56,14 @@ const MAIN_CATS = [
 ]
 
 const OTHER_SUBCATS = [
-  'writing',
   'analysis',
   'code review',
+  'code_review',
   'refactoring',
   'documentation',
   'architecture',
   'agentic',
+  'writing',
 ]
 
 interface NormalizedCategory {
@@ -81,7 +82,9 @@ function normalizeCategories(
 
   for (const c of cats) {
     const key = c.category.toLowerCase().trim()
-    if (MAIN_CATS.includes(key)) {
+    if (key === 'other') {
+      otherTotal += c.session_count
+    } else if (MAIN_CATS.includes(key)) {
       mainCounts[key] = (mainCounts[key] ?? 0) + c.session_count
     } else if (OTHER_SUBCATS.includes(key)) {
       subCounts[key] = (subCounts[key] ?? 0) + c.session_count
@@ -429,21 +432,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                                   : 'none',
                               }}
                             >
-                              <span style={{
-                                fontSize: 11,
-                                color:    'var(--gray-600)',
-                                display:  'flex',
-                                alignItems: 'center',
-                                gap: 6,
-                              }}>
-                                <span style={{
-                                  width:        4,
-                                  height:       4,
-                                  borderRadius: '50%',
-                                  background:   'var(--gray-400)',
-                                  display:      'inline-block',
-                                  flexShrink:   0,
-                                }} />
+                              <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>
                                 {formatCategory(s.category)}
                               </span>
                               <span style={{
