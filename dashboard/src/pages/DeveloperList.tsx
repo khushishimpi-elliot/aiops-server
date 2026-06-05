@@ -87,7 +87,6 @@ function normalizeCategories(
       subCounts[key] = (subCounts[key] ?? 0) + c.session_count
       otherTotal += c.session_count
     } else {
-      subCounts['other'] = (subCounts['other'] ?? 0) + c.session_count
       otherTotal += c.session_count
     }
   }
@@ -110,29 +109,28 @@ function normalizeCategories(
     }
   }
 
-  // Add Other last with sub-items
+  // Add Other last with sub-items (only the specified sub-categories)
   if (otherTotal > 0) {
-    const subTotal = otherTotal || 1
-    const subs = [
-      ...OTHER_SUBCATS
-        .filter(k => subCounts[k] && subCounts[k] > 0)
-        .map(k => ({
-          category:      k,
-          session_count: subCounts[k],
-          pct:           Math.round((subCounts[k] / subTotal) * 100),
-        })),
-      ...(subCounts['other'] && subCounts['other'] > 0 ? [{
-        category:      'other',
-        session_count: subCounts['other'],
-        pct:           Math.round((subCounts['other'] / subTotal) * 100),
-      }] : []),
-    ].sort((a, b) => b.session_count - a.session_count)
+    const subs = OTHER_SUBCATS
+      .filter(k => subCounts[k] && subCounts[k] > 0)
+      .map(k => ({
+        category:      k,
+        session_count: subCounts[k],
+        pct:           0, // pct will be calculated relative to otherTotal
+      }))
+      .sort((a, b) => b.session_count - a.session_count)
+
+    // Calculate percentages for sub-items
+    const subTotal = subs.reduce((sum, s) => sum + s.session_count, 0) || 1
+    subs.forEach(s => {
+      s.pct = Math.round((s.session_count / subTotal) * 100)
+    })
 
     result.push({
       category:      'other',
       session_count: otherTotal,
       pct:           Math.round((otherTotal / total) * 100),
-      sub:           subs,
+      sub:           subs.length > 0 ? subs : undefined,
     })
   }
 
