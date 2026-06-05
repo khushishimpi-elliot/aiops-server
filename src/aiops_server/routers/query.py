@@ -48,8 +48,9 @@ async def list_developers(
             COALESCE(us.total_output_tokens,   0)::bigint  AS total_output_tokens,
             -- Last active = most recent day the developer actually used the tool
             -- (usage.date from the Claude logs), all-time — independent of the
-            -- selected window.
-            (SELECT MAX(us2.date) FROM usage us2 WHERE us2.user_id = u.id) AS last_active,
+            -- selected window. Clamp to CURRENT_DATE to handle timezone-related
+            -- date discrepancies that may push dates into the future.
+            LEAST((SELECT MAX(us2.date) FROM usage us2 WHERE us2.user_id = u.id), CURRENT_DATE) AS last_active,
             COALESCE(d.active_devices, 0)::int             AS active_devices
         FROM   users u
         LEFT JOIN (
