@@ -206,8 +206,10 @@ export function getSessionsSince(days: number): SessionRecord[] {
   if (!ensureOpen() || !db) return [];
   const cutoff = Date.now() - days * 86400000;
   try {
+    // Include sessions with session_timestamp = 0 (unknown timestamp) so they
+    // are never silently dropped from syncs regardless of the days window.
     const rows = db.prepare(
-      `SELECT * FROM sessions WHERE session_timestamp >= ? ORDER BY session_timestamp DESC`
+      `SELECT * FROM sessions WHERE session_timestamp >= ? OR session_timestamp = 0 ORDER BY session_timestamp DESC`
     ).all(cutoff) as Record<string, unknown>[];
     return rows.map(rowToSession);
   } catch (err) {
