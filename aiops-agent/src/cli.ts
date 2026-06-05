@@ -11,14 +11,17 @@ import { readLastLines, logFilePath } from './core/logger.js';
 import { runAnalysis } from './core/analyst.js';
 import { startServer } from './core/server.js';
 import { PATHS } from './core/paths.js';
-import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats, getSessionsSince } from './core/db.js';
+import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats } from './core/db.js';
 import { saveConfig, getMachineId, isEnrolled, loadConfig as _loadConfig } from './core/config.js';
 import { syncToServer } from './core/syncer.js';
 import { startDaemon, isDaemonAlive, stopDaemon, readDaemonPid, LOG_FILE as DAEMON_LOG } from './core/daemon.js';
 import { install as installAutoStart, uninstall as uninstallAutoStart, isInstalled as isAutoStartInstalled } from './core/installer.js';
-import { checkAndUpdate } from './core/updater.js';
 
 const VERSION = '1.0.0';
+
+// Sync window covering the entire local history. Old days are safe to
+// re-send: the server upserts by (date, tool, model, category).
+const FULL_HISTORY_DAYS = 3650;
 
 // ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
 
@@ -192,9 +195,16 @@ async function cmdScan(opts: { json?: boolean } = {}): Promise<void> {
   const cutoff28 = nowMs - 28 * 86400000;
   const todayStr = today();
 
-  // 1. Run all adapters
+  // 1. Run all adapters — deduplicate by (sessionId, tool) to match DB count
   const results = runAllAdapters();
-  const allSessions = results.flatMap(r => r.sessions);
+  const _raw = results.flatMap(r => r.sessions);
+  const _seen = new Set<string>();
+  const allSessions = _raw.filter(s => {
+    const key = `${s.sessionId}|${s.tool}`;
+    if (_seen.has(key)) return false;
+    _seen.add(key);
+    return true;
+  });
 
   // 2. Sessions in last 28 days
   const recent = allSessions.filter(s => !s.sessionTimestamp || s.sessionTimestamp >= cutoff28);
@@ -804,9 +814,10 @@ function cmdStatus(): void {
     console.log(chalk.dim('  Run         ') + chalk.white('aiops enroll --server URL --token TOKEN'));
   }
 
-  const daemonRunning = isDaemonAlive();
-  const autoStartOn   = isAutoStartInstalled();
-  const daemonPid     = readDaemonPid();
+  // Daemon status
+  const daemonRunning  = isDaemonAlive();
+  const autoStartOn    = isAutoStartInstalled();
+  const daemonPid      = readDaemonPid();
   console.log();
   console.log(chalk.bold('Daemon        ') + (daemonRunning
     ? chalk.green(`running  (PID ${daemonPid})`)
@@ -1094,23 +1105,20 @@ async function cmdStart(): Promise<void> {
   // ── Step 3: Sync to server ────────────────────────────────────────────────
   let syncOk = false;
   if (enrolled) {
-    const daemonRunning = isDaemonAlive();
-    if (daemonRunning) {
-      console.log(chalk.dim('  ℹ Daemon is running — sync will happen automatically every 15 min'));
-      syncOk = true;
-    } else {
-      try {
-        console.log(chalk.white('  Syncing data to company server...'));
-        const result = await syncToServer(28, false);
-        if (result.success) {
-          syncOk = true;
-          console.log(chalk.green('  ✅ Data synced to server'));
-        } else {
-          console.log(chalk.yellow('  ⚠ Sync failed — data saved locally, will retry next time'));
-        }
-      } catch {
+    try {
+      console.log(chalk.white('  Syncing data to company server...'));
+      // Send the FULL local history (not just 28 days) so the server matches
+      // the local session count — the server upserts cumulatively, so
+      // re-sending old days is safe and idempotent.
+      const result = await syncToServer(FULL_HISTORY_DAYS, false);
+      if (result.success) {
+        syncOk = true;
+        console.log(chalk.green('  ✅ Data synced to server'));
+      } else {
         console.log(chalk.yellow('  ⚠ Sync failed — data saved locally, will retry next time'));
       }
+    } catch {
+      console.log(chalk.yellow('  ⚠ Sync failed — data saved locally, will retry next time'));
     }
     console.log();
   } else {
@@ -1179,6 +1187,42 @@ async function cmdStart(): Promise<void> {
   console.log();
 }
 
+// ─── WATCH COMMAND (continuous scan + sync) ──────────────────────────────────
+
+async function watchTick(): Promise<void> {
+  const ts = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  try {
+    openDb();
+    const liveSessions = runAllAdapters().flatMap(r => r.sessions);
+    if (liveSessions.length) upsertSessions(liveSessions);
+    const total = dbAvailable() ? getDbStats().totalRows : liveSessions.length;
+
+    if (isEnrolled()) {
+      const result = await syncToServer(FULL_HISTORY_DAYS, false);
+      if (result.success) {
+        console.log(chalk.gray(`  [${ts}] `) + chalk.green('✓') + chalk.white(` ${total} sessions — synced ${result.aggregatesSent} aggregates (${result.daysIncluded} days)`));
+      } else {
+        console.log(chalk.gray(`  [${ts}] `) + chalk.yellow('⚠') + chalk.white(` ${total} sessions — sync failed: ${result.error ?? 'unknown'}`));
+      }
+    } else {
+      console.log(chalk.gray(`  [${ts}] `) + chalk.white(`${total} sessions saved locally`) + chalk.dim(' (not enrolled — no sync)'));
+    }
+  } catch (err) {
+    console.log(chalk.gray(`  [${ts}] `) + chalk.yellow('⚠ tick failed: ' + (err as Error).message));
+  }
+}
+
+async function cmdWatch(opts: { interval?: string }): Promise<void> {
+  const minutes = Math.max(1, parseInt(opts.interval ?? '5') || 5);
+  console.log();
+  console.log(`  ${chalk.bold.cyan('AIOps Watch')}  ${chalk.gray('v' + VERSION)}`);
+  console.log(chalk.dim(`  Scanning + syncing every ${minutes} min. Press Ctrl+C to stop.`));
+  console.log();
+
+  await watchTick();
+  setInterval(() => { void watchTick(); }, minutes * 60_000);
+}
+
 // ─── CLI SETUP ────────────────────────────────────────────────────────────────
 
 program.name('aiops').version(VERSION).description('Monitor AI coding tool usage and costs');
@@ -1186,6 +1230,11 @@ program.name('aiops').version(VERSION).description('Monitor AI coding tool usage
 program.command('start')
   .description('Scan, save and sync everything (recommended)')
   .action(() => cmdStart());
+
+program.command('watch')
+  .description('Keep scanning and syncing to the server continuously (real-time mode)')
+  .option('-i, --interval <minutes>', 'minutes between scans', '5')
+  .action((opts: { interval?: string }) => cmdWatch(opts));
 
 program.command('scan')
   .description('Scan AI tools on this machine')
@@ -1403,7 +1452,7 @@ program
 program
   .command('sync')
   .description('Send data to company server')
-  .option('--days <n>', 'How many days of data to send')
+  .option('--days <n>', 'How many days of data to send (default: full history)', String(FULL_HISTORY_DAYS))
   .option('--dry-run', 'Preview what would be sent without sending')
   .action(async (opts: { days?: string; dryRun?: boolean }) => {
     if (!isEnrolled()) {
@@ -1412,6 +1461,7 @@ program
       return;
     }
 
+    const days   = parseInt(opts.days ?? String(FULL_HISTORY_DAYS)) || FULL_HISTORY_DAYS;
     const dryRun = !!opts.dryRun;
 
     // Refresh the local DB with the latest live session data so sync is
@@ -1419,14 +1469,6 @@ program
     openDb();
     const liveSessions = runAllAdapters().flatMap(r => r.sessions);
     if (liveSessions.length) upsertSessions(liveSessions);
-
-    // Default to full history (10 years) so nothing is ever missed. This must
-    // NOT depend on the local DB — on machines where better-sqlite3 isn't built
-    // the DB is empty, and reading the oldest date from it silently fell back
-    // to 30 days, so older history never reached the dashboard. The aggregator
-    // filters live sessions to this window, and days >= 365 marks it a full
-    // sync so the server reconciles the complete snapshot.
-    const days = opts.days ? (parseInt(opts.days) || 3650) : 3650;
 
     if (dryRun) {
       console.log(chalk.bold('\n  DRY RUN — nothing will be sent\n'));
@@ -1472,45 +1514,18 @@ program
     console.log();
   });
 
-// ── install command ───────────────────────────────────────────────────────────
 // ─── DAEMON COMMAND ──────────────────────────────────────────────────────────
-// Long-running background process: file-watches AI logs and syncs ~2 min after
-// each session ends, plus a periodic full-history sync every 15 min. This is
-// what keeps the dashboard matching real usage without anyone running commands.
 
 program.command('daemon')
-  .description('Run the background sync daemon (normally started automatically by the OS)')
+  .description('Run background sync daemon (normally started automatically by the OS)')
   .action(async () => {
     await startDaemon();
   });
 
-program.command('update')
-  .description('Update the agent to the latest version from your company server')
-  .action(async () => {
-    console.log();
-    console.log(chalk.dim('  Checking for updates...'));
-    const r = await checkAndUpdate();
-    if (r.updated) {
-      console.log(chalk.green('  ✅ Updated to the latest version'));
-      // Restart the daemon so the new code is live immediately
-      if (isDaemonAlive()) {
-        stopDaemon();
-        await new Promise(res => setTimeout(res, 800));
-        const result = installAutoStart();
-        if (result.ok) console.log(chalk.dim('  Daemon restarted on the new version'));
-      }
-    } else if (r.reason === 'up to date') {
-      console.log(chalk.green('  ✅ Already on the latest version'));
-    } else if (r.reason === 'not enrolled') {
-      console.log(chalk.yellow('  Not enrolled — run: aiops enroll --server URL'));
-    } else {
-      console.log(chalk.yellow(`  Could not update: ${r.reason ?? 'unknown'}`));
-    }
-    console.log();
-  });
+// ─── INSTALL / UNINSTALL ─────────────────────────────────────────────────────
 
 program.command('install')
-  .description('Register the sync daemon to auto-start at login (Mac/Windows/Linux)')
+  .description('Register daemon to auto-start at login (Mac: launchd | Windows: Task Scheduler | Linux: systemd)')
   .action(async () => {
     console.log();
     divider();
@@ -1518,7 +1533,7 @@ program.command('install')
     divider();
     console.log();
 
-    // Restart cleanly if a daemon is already running an older build
+    // Stop any running daemon first so the new registration takes effect cleanly
     if (isDaemonAlive()) {
       console.log(chalk.dim('  Stopping existing daemon...'));
       stopDaemon();
@@ -1545,11 +1560,13 @@ program.command('uninstall')
   .description('Remove auto-start registration and stop the daemon')
   .action(async () => {
     console.log();
+
     if (isDaemonAlive()) {
       console.log(chalk.dim('  Stopping daemon...'));
       stopDaemon();
       await new Promise(r => setTimeout(r, 800));
     }
+
     const result = uninstallAutoStart();
     if (result.ok) {
       console.log(chalk.green(`  ✅ ${result.message}`));

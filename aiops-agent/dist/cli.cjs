@@ -15707,7 +15707,14 @@ async function cmdScan(opts = {}) {
   const cutoff28 = nowMs - 28 * 864e5;
   const todayStr = today();
   const results = runAllAdapters();
-  const allSessions = results.flatMap((r) => r.sessions);
+  const _raw = results.flatMap((r) => r.sessions);
+  const _seen = /* @__PURE__ */ new Set();
+  const allSessions = _raw.filter((s) => {
+    const key = `${s.sessionId}|${s.tool}`;
+    if (_seen.has(key)) return false;
+    _seen.add(key);
+    return true;
+  });
   const recent = allSessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff28);
   if (allSessions.length === 0) {
     console.log();
