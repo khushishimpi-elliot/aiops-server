@@ -632,7 +632,7 @@ html, body {
   background: #fff;
   border: 1px solid var(--gray-200);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-soft);

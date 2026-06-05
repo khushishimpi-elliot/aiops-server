@@ -554,8 +554,6 @@ export default function OrgOverview() {
                                 paddingBottom:    8,
                                 borderLeft:       '2px solid var(--gray-200)',
                                 paddingLeft:      12,
-                                maxHeight:        '300px',
-                                overflowY:        'auto',
                               }}>
                                 {c.sub.map((s, si) => (
                                   <div

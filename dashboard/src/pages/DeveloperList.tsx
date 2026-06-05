@@ -412,8 +412,6 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                           marginBottom:   10,
                           paddingLeft:    8,
                           borderLeft:     '2px solid var(--gray-200)',
-                          maxHeight:      '300px',
-                          overflowY:      'auto',
                           paddingBottom:  8,
                         }}>
                           {c.sub.map((s, si) => (
