@@ -129,10 +129,11 @@ export function loadCursor(): AdapterResult {
           if (mc?.['modelName']) model = String(mc['modelName']);
         }
 
-        // Skip empty composers (no turns means the session was never used)
-        if (turnCount === 0 && bubbleRows.length === 0) { skipped++; continue; }
-
         const sessionTs = toTimestamp(data['createdAt']);
+
+        // Include sessions with a valid timestamp, even if no interactions (turnCount=0, bubbleRows=0)
+        // These are initialized sessions that exist but weren't used yet
+        if (!sessionTs) { skipped++; continue; }
 
         sessions.push({
           tool: 'cursor',
