@@ -49,46 +49,51 @@ function formatCategory(cat: string): string {
 function normalizeCategories(
   cats: { category: string; session_count: number; pct: number }[]
 ): { category: string; session_count: number; pct: number }[] {
-  const MAIN = [
+  const ORDER = [
     'code_generation',
-    'configuration',
     'debugging',
+    'configuration',
+    'testing',
     'research',
+    'writing',
+    'automation',
+    'analysis',
   ]
 
-  const normalized: Record<string, number> = {
-    code_generation: 0,
-    testing:         0,
-    configuration:   0,
-    debugging:       0,
-    research:        0,
-    other:           0,
-  }
+  const counts: Record<string, number> = {}
 
   for (const c of cats) {
     const key = c.category.toLowerCase().trim()
-    if (MAIN.includes(key)) {
-      normalized[key] += c.session_count
-    } else {
-      normalized['other'] += c.session_count
+    const mapped = ORDER.includes(key) ? key : 'other'
+    counts[mapped] = (counts[mapped] ?? 0) + c.session_count
+  }
+
+  const total = Object.values(counts)
+    .reduce((a, b) => a + b, 0) || 1
+
+  // Build ordered list with other always last
+  const result: { category: string; session_count: number; pct: number }[] = []
+
+  for (const key of ORDER) {
+    if (counts[key] && counts[key] > 0) {
+      result.push({
+        category:      key,
+        session_count: counts[key],
+        pct:           Math.round((counts[key] / total) * 100),
+      })
     }
   }
 
-  const total = Object.values(normalized)
-    .reduce((a, b) => a + b, 0) || 1
-
-  return Object.entries(normalized)
-    .filter(([, count]) => count > 0)
-    .map(([category, session_count]) => ({
-      category,
-      session_count,
-      pct: Math.round((session_count / total) * 100),
-    }))
-    .sort((a, b) => {
-      if (a.category === 'other') return 1
-      if (b.category === 'other') return -1
-      return b.session_count - a.session_count
+  // Add other at the end
+  if (counts['other'] && counts['other'] > 0) {
+    result.push({
+      category:      'other',
+      session_count: counts['other'],
+      pct:           Math.round((counts['other'] / total) * 100),
     })
+  }
+
+  return result
 }
 
 function nameFromEmail(email: string): string {
@@ -121,11 +126,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
   const [loading, setLoading] = useState(true)
   const [breakdownExpanded, setBreakdownExpanded] = useState(false)
   const [modelsExpanded, setModelsExpanded] = useState(false)
-  const [otherCatsExpanded, setOtherCatsExpanded] = useState(false)
   const [toolsExpanded, setToolsExpanded] = useState(false)
 
   useEffect(() => {
-    setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false); setOtherCatsExpanded(false); setToolsExpanded(false)
+    setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false); setToolsExpanded(false)
     api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
   }, [email, days])
 
@@ -322,85 +326,25 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
               </div>
 
               {/* Tasks AI Used For */}
-              {data.task_categories.length > 0 && (() => {
-                const MAIN = ['code_generation','configuration','debugging','research']
-                const normalized = normalizeCategories(data.task_categories || [])
-                const mainCats = normalized.filter(c => c.category !== 'other')
-                const otherEntry = normalized.find(c => c.category === 'other')
-                const otherSubs = (data.task_categories || [])
-                  .filter(c => !MAIN.includes(c.category.toLowerCase().trim()) && c.category.toLowerCase().trim() !== 'other')
-                  .sort((a, b) => b.session_count - a.session_count)
-                return (
-                  <div className="drawer-section">
-                    <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
-                    {mainCats.map((c, i) => (
-                      <div key={c.category} style={{ marginBottom: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{formatCategory(c.category)}</span>
-                          </div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
+              {data.task_categories.length > 0 && (
+                <div className="drawer-section">
+                  <div className="drawer-section-title"><span className="dsicon">◆</span> Tasks AI Used For</div>
+                  {normalizeCategories(data.task_categories || []).map((c, i) => (
+                    <div key={c.category} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>{formatCategory(c.category)}</span>
                         </div>
-                        <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
-                          <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
-                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{c.pct}%</span>
                       </div>
-                    ))}
-                    {otherEntry && otherSubs.length > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[5], flexShrink: 0 }} />
-                            <button
-                              onClick={() => setOtherCatsExpanded(!otherCatsExpanded)}
-                              style={{
-                                background: 'none', border: 'none', cursor: 'pointer',
-                                padding: 0, display: 'flex', alignItems: 'center', gap: 4,
-                                fontSize: 12, color: 'var(--gray-700)', fontWeight: 500,
-                              }}
-                            >
-                              Other
-                              <span style={{
-                                fontSize: 10, color: 'var(--gray-500)',
-                                background: 'var(--gray-100)', borderRadius: 4,
-                                padding: '1px 5px', fontWeight: 600,
-                              }}>
-                                {otherSubs.length}
-                              </span>
-                              <span style={{ fontSize: 9, color: 'var(--gray-400)' }}>
-                                {otherCatsExpanded ? '▲' : '▼'}
-                              </span>
-                            </button>
-                          </div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-600)' }}>{otherEntry.pct}%</span>
-                        </div>
-                        <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
-                          <div style={{ height: '100%', width: `${otherEntry.pct}%`, background: CAT_COLORS[5], borderRadius: 2 }} />
-                        </div>
-                        {otherCatsExpanded && (
-                          <div style={{ marginTop: 8, paddingLeft: 14, borderLeft: '2px solid var(--gray-100)' }}>
-                            {otherSubs.map(sub => (
-                              <div key={sub.category} style={{ marginBottom: 8 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                                  <span style={{ fontSize: 11, color: 'var(--gray-600)' }}>{formatCategory(sub.category)}</span>
-                                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>{sub.session_count} sessions</span>
-                                    <span style={{ fontSize: 11, color: 'var(--gray-500)', fontWeight: 600 }}>{sub.pct}%</span>
-                                  </div>
-                                </div>
-                                <div style={{ height: 3, background: 'var(--gray-100)', borderRadius: 2 }}>
-                                  <div style={{ height: '100%', width: `${sub.pct}%`, background: CAT_COLORS[5], borderRadius: 2 }} />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div style={{ height: 4, background: 'var(--gray-100)', borderRadius: 2 }}>
+                        <div style={{ height: '100%', width: `${c.pct}%`, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2 }} />
                       </div>
-                    )}
-                  </div>
-                )
-              })()}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Daily Breakdown */}
               <div className="drawer-section">
