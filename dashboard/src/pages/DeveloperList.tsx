@@ -235,7 +235,9 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
     )
     return {
       label,
-      sessions: rows.length,
+      // Real session count for the window — summing per-day session_count, not
+      // counting active days (rows.length), which badly under-reported.
+      sessions: rows.reduce((s, r) => s + (r.session_count ?? 0), 0),
       tokens: rows.reduce((s, r) => s + r.input_tokens + r.output_tokens + (r.cache_tokens ?? 0), 0),
       cost:    rows.reduce((s, r) => s + r.cost_millicents, 0),
     }

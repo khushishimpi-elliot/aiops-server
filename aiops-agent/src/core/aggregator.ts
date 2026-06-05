@@ -1,4 +1,6 @@
 import { getSessionsSince } from './db.js';
+import { getAllSessions } from '../adapters/index.js';
+import type { SessionRecord } from './types.js';
 
 export interface DailyAggregate {
   date: string;
@@ -28,11 +30,24 @@ function classifyCategory(prompt: string | undefined): string {
 }
 
 export function computeDailyAggregates(days: number): DailyAggregate[] {
-  let sessions: ReturnType<typeof getSessionsSince> = [];
+  // Aggregate from the LIVE scan so synced data matches `aiops scan` and works
+  // on machines where better-sqlite3 isn't built (empty DB). Fall back to the
+  // DB only when the live scan yields nothing (offline/unreadable logs).
+  let sessions: SessionRecord[] = [];
   try {
-    sessions = getSessionsSince(days);
+    sessions = getAllSessions();
   } catch {
-    return [];
+    sessions = [];
+  }
+  if (sessions.length) {
+    const cutoff = Date.now() - days * 86_400_000;
+    sessions = sessions.filter(s => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
+  } else {
+    try {
+      sessions = getSessionsSince(days);
+    } catch {
+      return [];
+    }
   }
 
   const groups = new Map<string, DailyAggregate>();
@@ -41,7 +56,11 @@ export function computeDailyAggregates(days: number): DailyAggregate[] {
 
   for (const s of sessions) {
     const category = classifyCategory(s.firstPrompt);
-    const date = s.sessionDate || todayStr;
+    // Some tools (e.g. Codex) leave sessionDate empty but carry a timestamp.
+    // Derive the date from the timestamp so the session still syncs and lands
+    // on the right day — falling back to today only if neither is present.
+    const date = s.sessionDate
+      || (s.sessionTimestamp ? new Date(s.sessionTimestamp).toISOString().slice(0, 10) : todayStr);
     const key = [date, s.tool, s.model, category].join('|');
 
     if (!groups.has(key)) {

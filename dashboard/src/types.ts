@@ -14,6 +14,7 @@ export interface DailyUsage {
   input_tokens: number
   output_tokens: number
   cache_tokens?: number
+  session_count?: number
 }
 
 export interface TaskCategoryItem {

@@ -960,7 +960,7 @@ var require_command = __commonJS({
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
     var path15 = require("node:path");
-    var fs18 = require("node:fs");
+    var fs19 = require("node:fs");
     var process3 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1893,10 +1893,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
           const localBin = path15.resolve(baseDir, baseName);
-          if (fs18.existsSync(localBin)) return localBin;
+          if (fs19.existsSync(localBin)) return localBin;
           if (sourceExt.includes(path15.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs18.existsSync(`${localBin}${ext}`)
+            (ext) => fs19.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1908,7 +1908,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs18.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs19.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
@@ -6571,15 +6571,15 @@ var require_picomatch2 = __commonJS({
 var require_readdirp = __commonJS({
   "node_modules/readdirp/index.js"(exports2, module2) {
     "use strict";
-    var fs18 = require("fs");
+    var fs19 = require("fs");
     var { Readable } = require("stream");
     var sysPath = require("path");
     var { promisify } = require("util");
     var picomatch = require_picomatch2();
-    var readdir = promisify(fs18.readdir);
-    var stat = promisify(fs18.stat);
-    var lstat = promisify(fs18.lstat);
-    var realpath = promisify(fs18.realpath);
+    var readdir = promisify(fs19.readdir);
+    var stat = promisify(fs19.stat);
+    var lstat = promisify(fs19.lstat);
+    var realpath = promisify(fs19.realpath);
     var BANG = "!";
     var RECURSIVE_ERROR_CODE = "READDIRP_RECURSIVE_ERROR";
     var NORMAL_FLOW_ERRORS = /* @__PURE__ */ new Set(["ENOENT", "EPERM", "EACCES", "ELOOP", RECURSIVE_ERROR_CODE]);
@@ -6653,7 +6653,7 @@ var require_readdirp = __commonJS({
         this._wantsFile = [FILE_TYPE, FILE_DIR_TYPE, EVERYTHING_TYPE].includes(type);
         this._wantsEverything = type === EVERYTHING_TYPE;
         this._root = sysPath.resolve(root);
-        this._isDirent = "Dirent" in fs18 && !opts.alwaysStat;
+        this._isDirent = "Dirent" in fs19 && !opts.alwaysStat;
         this._statsProp = this._isDirent ? "dirent" : "stats";
         this._rdOptions = { encoding: "utf8", withFileTypes: this._isDirent };
         this.parents = [this._exploreDir(root, 1)];
@@ -8505,7 +8505,7 @@ var require_constants3 = __commonJS({
 var require_nodefs_handler = __commonJS({
   "node_modules/chokidar/lib/nodefs-handler.js"(exports2, module2) {
     "use strict";
-    var fs18 = require("fs");
+    var fs19 = require("fs");
     var sysPath = require("path");
     var { promisify } = require("util");
     var isBinaryPath = require_is_binary_path();
@@ -8528,11 +8528,11 @@ var require_nodefs_handler = __commonJS({
       STAR
     } = require_constants3();
     var THROTTLE_MODE_WATCH = "watch";
-    var open = promisify(fs18.open);
-    var stat = promisify(fs18.stat);
-    var lstat = promisify(fs18.lstat);
-    var close = promisify(fs18.close);
-    var fsrealpath = promisify(fs18.realpath);
+    var open = promisify(fs19.open);
+    var stat = promisify(fs19.stat);
+    var lstat = promisify(fs19.lstat);
+    var close = promisify(fs19.close);
+    var fsrealpath = promisify(fs19.realpath);
     var statMethods = { lstat, stat };
     var foreach = (val, fn) => {
       if (val instanceof Set) {
@@ -8579,7 +8579,7 @@ var require_nodefs_handler = __commonJS({
         }
       };
       try {
-        return fs18.watch(path15, options, handleEvent);
+        return fs19.watch(path15, options, handleEvent);
       } catch (error) {
         errHandler(error);
       }
@@ -8664,7 +8664,7 @@ var require_nodefs_handler = __commonJS({
       if (copts && (copts.persistent < options.persistent || copts.interval > options.interval)) {
         listeners = cont.listeners;
         rawEmitters = cont.rawEmitters;
-        fs18.unwatchFile(fullPath);
+        fs19.unwatchFile(fullPath);
         cont = void 0;
       }
       if (cont) {
@@ -8675,7 +8675,7 @@ var require_nodefs_handler = __commonJS({
           listeners: listener,
           rawEmitters: rawEmitter,
           options,
-          watcher: fs18.watchFile(fullPath, options, (curr, prev) => {
+          watcher: fs19.watchFile(fullPath, options, (curr, prev) => {
             foreach(cont.rawEmitters, (rawEmitter2) => {
               rawEmitter2(EV_CHANGE, fullPath, { curr, prev });
             });
@@ -8692,7 +8692,7 @@ var require_nodefs_handler = __commonJS({
         delFromSet(cont, KEY_RAW, rawEmitter);
         if (isEmptySet(cont.listeners)) {
           FsWatchFileInstances.delete(fullPath);
-          fs18.unwatchFile(fullPath);
+          fs19.unwatchFile(fullPath);
           cont.options = cont.watcher = void 0;
           Object.freeze(cont);
         }
@@ -8996,7 +8996,7 @@ var require_nodefs_handler = __commonJS({
 var require_fsevents_handler = __commonJS({
   "node_modules/chokidar/lib/fsevents-handler.js"(exports2, module2) {
     "use strict";
-    var fs18 = require("fs");
+    var fs19 = require("fs");
     var sysPath = require("path");
     var { promisify } = require("util");
     var fsevents;
@@ -9041,9 +9041,9 @@ var require_fsevents_handler = __commonJS({
       IDENTITY_FN
     } = require_constants3();
     var Depth = (value) => isNaN(value) ? {} : { depth: value };
-    var stat = promisify(fs18.stat);
-    var lstat = promisify(fs18.lstat);
-    var realpath = promisify(fs18.realpath);
+    var stat = promisify(fs19.stat);
+    var lstat = promisify(fs19.lstat);
+    var realpath = promisify(fs19.realpath);
     var statMethods = { stat, lstat };
     var FSEventsWatchers = /* @__PURE__ */ new Map();
     var consolidateThreshhold = 10;
@@ -9393,7 +9393,7 @@ var require_chokidar = __commonJS({
   "node_modules/chokidar/index.js"(exports2) {
     "use strict";
     var { EventEmitter } = require("events");
-    var fs18 = require("fs");
+    var fs19 = require("fs");
     var sysPath = require("path");
     var { promisify } = require("util");
     var readdirp = require_readdirp();
@@ -9438,8 +9438,8 @@ var require_chokidar = __commonJS({
       isMacos,
       isIBMi
     } = require_constants3();
-    var stat = promisify(fs18.stat);
-    var readdir = promisify(fs18.readdir);
+    var stat = promisify(fs19.stat);
+    var readdir = promisify(fs19.readdir);
     var arrify = (value = []) => Array.isArray(value) ? value : [value];
     var flatten = (list, result = []) => {
       list.forEach((item) => {
@@ -9933,7 +9933,7 @@ var require_chokidar = __commonJS({
         }
         const now = /* @__PURE__ */ new Date();
         const awaitWriteFinish = (prevStat) => {
-          fs18.stat(fullPath, (err, curStat) => {
+          fs19.stat(fullPath, (err, curStat) => {
             if (err || !this._pendingWrites.has(path15)) {
               if (err && err.code !== "ENOENT") awfEmit(err);
               return;
@@ -10134,7 +10134,7 @@ var require_chokidar = __commonJS({
 });
 
 // src/cli.ts
-var import_fs17 = __toESM(require("fs"), 1);
+var import_fs18 = __toESM(require("fs"), 1);
 var import_path14 = __toESM(require("path"), 1);
 var import_os8 = __toESM(require("os"), 1);
 
@@ -14063,6 +14063,9 @@ function runAllAdapters() {
   }
   return results;
 }
+function getAllSessions() {
+  return runAllAdapters().flatMap((r) => r.sessions);
+}
 function pathExists(id) {
   try {
     switch (id) {
@@ -15115,15 +15118,25 @@ function classifyCategory(prompt) {
 function computeDailyAggregates(days) {
   let sessions = [];
   try {
-    sessions = getSessionsSince(days);
+    sessions = getAllSessions();
   } catch {
-    return [];
+    sessions = [];
+  }
+  if (sessions.length) {
+    const cutoff = Date.now() - days * 864e5;
+    sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
+  } else {
+    try {
+      sessions = getSessionsSince(days);
+    } catch {
+      return [];
+    }
   }
   const groups = /* @__PURE__ */ new Map();
   const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   for (const s of sessions) {
     const category = classifyCategory(s.firstPrompt);
-    const date = s.sessionDate || todayStr;
+    const date = s.sessionDate || (s.sessionTimestamp ? new Date(s.sessionTimestamp).toISOString().slice(0, 10) : todayStr);
     const key = [date, s.tool, s.model, category].join("|");
     if (!groups.has(key)) {
       groups.set(key, {
@@ -15185,12 +15198,14 @@ async function syncToServer(days, dryRun) {
       preview: aggregates
     };
   }
+  const fullSync = days >= 365;
   const payload = {
     enrollment_token: config.enrollmentToken,
     machine_id: config.machineId || getMachineId(),
     hostname: import_os5.default.hostname(),
     os: process.platform,
     sent_at: (/* @__PURE__ */ new Date()).toISOString(),
+    full_sync: fullSync,
     aggregates: aggregates.map((a) => ({
       date: a.date,
       tool: a.tool,
@@ -15215,9 +15230,6 @@ async function syncToServer(days, dryRun) {
           "x-enrollment-token": config.enrollmentToken
         },
         body: JSON.stringify(payload),
-        // Generous timeout: the server may be cold-starting (Render free tier
-        // can take 30-60s to wake) and large rollups take a few seconds to
-        // persist. A short timeout aborts mid-write and reports a false failure.
         signal: AbortSignal.timeout(6e4)
       });
       if (res.ok) {
@@ -15254,41 +15266,115 @@ async function syncToServer(days, dryRun) {
 }
 
 // src/core/daemon.ts
-var import_fs15 = __toESM(require("fs"), 1);
+var import_fs16 = __toESM(require("fs"), 1);
 var import_path12 = __toESM(require("path"), 1);
 var import_os6 = __toESM(require("os"), 1);
+
+// src/core/updater.ts
+var import_fs15 = __toESM(require("fs"), 1);
+var import_crypto = __toESM(require("crypto"), 1);
+function bundlePath() {
+  return process.argv[1] || __filename;
+}
+function sha256File(file) {
+  const buf = import_fs15.default.readFileSync(file);
+  return import_crypto.default.createHash("sha256").update(buf).digest("hex");
+}
+async function checkAndUpdate(opts = {}) {
+  const config = loadConfig();
+  if (!config?.serverUrl) {
+    return { checked: false, updated: false, reason: "not enrolled" };
+  }
+  const base = config.serverUrl.replace(/\/$/, "");
+  const target = bundlePath();
+  let remoteHash;
+  try {
+    const res = await fetch(`${base}/download/manifest`, {
+      signal: AbortSignal.timeout(3e4)
+    });
+    if (!res.ok) {
+      return { checked: true, updated: false, reason: `manifest HTTP ${res.status}` };
+    }
+    const manifest = await res.json();
+    if (!manifest.sha256) {
+      return { checked: true, updated: false, reason: "manifest missing sha256" };
+    }
+    remoteHash = manifest.sha256;
+  } catch (err) {
+    if (!opts.silent) logError("updater", "manifest fetch failed", err);
+    return { checked: false, updated: false, reason: "server unreachable" };
+  }
+  let localHash;
+  try {
+    localHash = sha256File(target);
+  } catch (err) {
+    return { checked: true, updated: false, reason: "cannot read local bundle" };
+  }
+  if (localHash === remoteHash) {
+    return { checked: true, updated: false, reason: "up to date", localHash, remoteHash };
+  }
+  try {
+    const res = await fetch(`${base}/download/cli.cjs`, {
+      signal: AbortSignal.timeout(12e4)
+    });
+    if (!res.ok) {
+      return { checked: true, updated: false, reason: `download HTTP ${res.status}` };
+    }
+    const bytes = Buffer.from(await res.arrayBuffer());
+    const gotHash = import_crypto.default.createHash("sha256").update(bytes).digest("hex");
+    if (gotHash !== remoteHash) {
+      return { checked: true, updated: false, reason: "downloaded bundle hash mismatch" };
+    }
+    const tmp = `${target}.new`;
+    import_fs15.default.writeFileSync(tmp, bytes, { mode: 493 });
+    import_fs15.default.renameSync(tmp, target);
+    if (process.platform !== "win32") {
+      try {
+        import_fs15.default.chmodSync(target, 493);
+      } catch {
+      }
+    }
+    return { checked: true, updated: true, localHash, remoteHash };
+  } catch (err) {
+    if (!opts.silent) logError("updater", "bundle download/write failed", err);
+    return { checked: true, updated: false, reason: "download failed" };
+  }
+}
+
+// src/core/daemon.ts
 var AIOPS_DIR3 = import_path12.default.join(import_os6.default.homedir(), ".aiops");
 var PID_FILE = import_path12.default.join(AIOPS_DIR3, "daemon.pid");
 var LOG_FILE2 = import_path12.default.join(AIOPS_DIR3, "daemon.log");
 var DEBOUNCE_MS = 2 * 60 * 1e3;
 var INTERVAL_MS = 15 * 60 * 1e3;
 var LOG_MAX_BYTES = 500 * 1024;
+var SYNC_DAYS = 3650;
 function daemonLog(msg) {
   const line = `[${(/* @__PURE__ */ new Date()).toISOString()}] ${msg}
 `;
   try {
-    import_fs15.default.mkdirSync(AIOPS_DIR3, { recursive: true });
+    import_fs16.default.mkdirSync(AIOPS_DIR3, { recursive: true });
     try {
-      if (import_fs15.default.statSync(LOG_FILE2).size > LOG_MAX_BYTES) {
-        const old = import_fs15.default.readFileSync(LOG_FILE2, "utf8");
-        import_fs15.default.writeFileSync(LOG_FILE2, old.slice(-Math.floor(LOG_MAX_BYTES / 2)));
+      if (import_fs16.default.statSync(LOG_FILE2).size > LOG_MAX_BYTES) {
+        const old = import_fs16.default.readFileSync(LOG_FILE2, "utf8");
+        import_fs16.default.writeFileSync(LOG_FILE2, old.slice(-Math.floor(LOG_MAX_BYTES / 2)));
       }
     } catch {
     }
-    import_fs15.default.appendFileSync(LOG_FILE2, line);
+    import_fs16.default.appendFileSync(LOG_FILE2, line);
   } catch {
   }
 }
 function writePid() {
   try {
-    import_fs15.default.mkdirSync(AIOPS_DIR3, { recursive: true });
-    import_fs15.default.writeFileSync(PID_FILE, String(process.pid));
+    import_fs16.default.mkdirSync(AIOPS_DIR3, { recursive: true });
+    import_fs16.default.writeFileSync(PID_FILE, String(process.pid));
   } catch {
   }
 }
 function readDaemonPid() {
   try {
-    const n = parseInt(import_fs15.default.readFileSync(PID_FILE, "utf8").trim(), 10);
+    const n = parseInt(import_fs16.default.readFileSync(PID_FILE, "utf8").trim(), 10);
     return isNaN(n) ? null : n;
   } catch {
     return null;
@@ -15325,7 +15411,7 @@ async function scanAndSync(reason) {
       daemonLog(`Scanned: ${stats.totalRows} sessions in DB`);
     }
     if (isEnrolled()) {
-      const result = await syncToServer(30, false);
+      const result = await syncToServer(SYNC_DAYS, false);
       if (result.success) {
         daemonLog(`Sync OK \u2014 ${result.aggregatesSent} aggregates, ${result.daysIncluded} days`);
       } else {
@@ -15339,8 +15425,32 @@ async function scanAndSync(reason) {
     daemonLog(`Error: ${err.message}`);
   }
 }
+async function autoUpdate(reason) {
+  try {
+    const r = await checkAndUpdate({ silent: true });
+    if (r.updated) {
+      daemonLog(`Self-update (${reason}): bundle replaced \u2014 restarting to apply`);
+      try {
+        import_fs16.default.unlinkSync(PID_FILE);
+      } catch {
+      }
+      const { spawn: spawn2 } = await import("child_process");
+      const child = spawn2(process.execPath, [process.argv[1], "daemon"], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true
+      });
+      child.unref();
+      process.exit(0);
+    } else if (r.reason && r.reason !== "up to date") {
+      daemonLog(`Self-update check (${reason}): ${r.reason}`);
+    }
+  } catch (err) {
+    daemonLog(`Self-update check failed: ${err.message}`);
+  }
+}
 async function startDaemon() {
-  import_fs15.default.mkdirSync(AIOPS_DIR3, { recursive: true });
+  import_fs16.default.mkdirSync(AIOPS_DIR3, { recursive: true });
   if (isDaemonAlive()) {
     const existingPid = readDaemonPid();
     daemonLog(`Already running (PID ${existingPid}). Exiting.`);
@@ -15353,6 +15463,8 @@ async function startDaemon() {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => scanAndSync(reason), DEBOUNCE_MS);
   };
+  await autoUpdate("startup");
+  const updateId = setInterval(() => autoUpdate("daily"), 24 * 60 * 60 * 1e3);
   await scanAndSync("startup");
   try {
     watchAll((fp) => {
@@ -15368,9 +15480,10 @@ async function startDaemon() {
   const cleanup = (sig) => {
     daemonLog(`${sig} received \u2014 stopping`);
     clearInterval(intervalId);
+    clearInterval(updateId);
     if (debounceTimer) clearTimeout(debounceTimer);
     try {
-      import_fs15.default.unlinkSync(PID_FILE);
+      import_fs16.default.unlinkSync(PID_FILE);
     } catch {
     }
     process.exit(0);
@@ -15383,7 +15496,7 @@ async function startDaemon() {
 }
 
 // src/core/installer.ts
-var import_fs16 = __toESM(require("fs"), 1);
+var import_fs17 = __toESM(require("fs"), 1);
 var import_path13 = __toESM(require("path"), 1);
 var import_os7 = __toESM(require("os"), 1);
 var import_child_process = require("child_process");
@@ -15444,8 +15557,8 @@ function installMac() {
 </dict>
 </plist>`;
   try {
-    import_fs16.default.mkdirSync(MAC_PLIST_DIR, { recursive: true });
-    import_fs16.default.writeFileSync(MAC_PLIST, plist, "utf8");
+    import_fs17.default.mkdirSync(MAC_PLIST_DIR, { recursive: true });
+    import_fs17.default.writeFileSync(MAC_PLIST, plist, "utf8");
     try {
       (0, import_child_process.execSync)(`launchctl unload "${MAC_PLIST}" 2>/dev/null`, { stdio: "pipe" });
     } catch {
@@ -15462,68 +15575,66 @@ function uninstallMac() {
       (0, import_child_process.execSync)(`launchctl unload "${MAC_PLIST}" 2>/dev/null`, { stdio: "pipe" });
     } catch {
     }
-    if (import_fs16.default.existsSync(MAC_PLIST)) import_fs16.default.unlinkSync(MAC_PLIST);
+    if (import_fs17.default.existsSync(MAC_PLIST)) import_fs17.default.unlinkSync(MAC_PLIST);
     return { ok: true, message: "Removed launchd agent", method: "launchd" };
   } catch (err) {
     return { ok: false, message: `macOS uninstall failed: ${err.message}`, method: "launchd" };
   }
 }
 function isMacInstalled() {
-  return import_fs16.default.existsSync(MAC_PLIST);
+  return import_fs17.default.existsSync(MAC_PLIST);
 }
-var WIN_TASK = "AIOps Agent";
+var WIN_REG_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+var WIN_REG_VAL = "AIOps Agent";
 var WIN_VBS = import_path13.default.join(import_os7.default.homedir(), ".aiops", "start-daemon.vbs");
 function installWindows() {
   const { exec, script } = executorArgs();
-  const logFile = import_path13.default.join(import_os7.default.homedir(), ".aiops", "daemon.log");
   const vbs = `Set WshShell = CreateObject("WScript.Shell")
 WshShell.Run Chr(34) & "${exec.replace(/\\/g, "\\\\")}" & Chr(34) & " " & Chr(34) & "${script.replace(/\\/g, "\\\\")}" & Chr(34) & " daemon", 0, False
 `;
   try {
-    import_fs16.default.mkdirSync(import_path13.default.dirname(WIN_VBS), { recursive: true });
-    import_fs16.default.writeFileSync(WIN_VBS, vbs, "utf8");
+    import_fs17.default.mkdirSync(import_path13.default.dirname(WIN_VBS), { recursive: true });
+    import_fs17.default.writeFileSync(WIN_VBS, vbs, "utf8");
   } catch (err) {
-    return { ok: false, message: `Failed to write VBS wrapper: ${err.message}`, method: "schtasks" };
+    return { ok: false, message: `Failed to write launcher: ${err.message}`, method: "registry" };
+  }
+  const regValue = `wscript.exe "${WIN_VBS}"`;
+  const regCmd = `reg add "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /t REG_SZ /d "${regValue}" /f`;
+  try {
+    (0, import_child_process.execSync)(regCmd, { stdio: "pipe", shell: true });
+  } catch (err) {
+    return { ok: false, message: `Registry write failed: ${err.message}`, method: "registry" };
   }
   try {
-    (0, import_child_process.execSync)(`schtasks /delete /f /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
+    const child = (0, import_child_process.spawn)(exec, [script, "daemon"], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true
+    });
+    child.unref();
   } catch {
   }
-  const taskCmd = `schtasks /create /f /tn "${WIN_TASK}" /tr "wscript.exe \\"${WIN_VBS}\\"" /sc onlogon /rl limited /delay 0000:30`;
-  try {
-    (0, import_child_process.execSync)(taskCmd, { stdio: "pipe", shell: true });
-    try {
-      (0, import_child_process.execSync)(`schtasks /run /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
-    } catch {
-    }
-    return { ok: true, message: `Registered in Task Scheduler ("${WIN_TASK}")`, method: "schtasks" };
-  } catch (err) {
-    return { ok: false, message: `Windows install failed: ${err.message}`, method: "schtasks" };
-  }
+  return { ok: true, message: `Registered in Registry Run key ("${WIN_REG_VAL}")`, method: "registry" };
 }
 function uninstallWindows() {
   const errors = [];
   try {
-    (0, import_child_process.execSync)(`schtasks /end /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
-  } catch {
-  }
-  try {
-    (0, import_child_process.execSync)(`schtasks /delete /f /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
+    (0, import_child_process.execSync)(`reg delete "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /f`, { stdio: "pipe", shell: true });
   } catch (err) {
     errors.push(err.message);
   }
   try {
-    if (import_fs16.default.existsSync(WIN_VBS)) import_fs16.default.unlinkSync(WIN_VBS);
+    if (import_fs17.default.existsSync(WIN_VBS)) import_fs17.default.unlinkSync(WIN_VBS);
   } catch {
   }
   if (errors.length) {
-    return { ok: false, message: `Windows uninstall failed: ${errors.join("; ")}`, method: "schtasks" };
+    return { ok: false, message: `Windows uninstall failed: ${errors.join("; ")}`, method: "registry" };
   }
-  return { ok: true, message: `Removed Task Scheduler entry ("${WIN_TASK}")`, method: "schtasks" };
+  return { ok: true, message: `Removed Registry Run entry ("${WIN_REG_VAL}")`, method: "registry" };
 }
 function isWindowsInstalled() {
   try {
-    (0, import_child_process.execSync)(`schtasks /query /tn "${WIN_TASK}"`, { stdio: "pipe", shell: true });
+    (0, import_child_process.execSync)(`reg query "${WIN_REG_KEY}" /v "${WIN_REG_VAL}"`, { stdio: "pipe", shell: true });
     return true;
   } catch {
     return false;
@@ -15553,8 +15664,8 @@ Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 WantedBy=default.target
 `;
   try {
-    import_fs16.default.mkdirSync(LINUX_SVC_DIR, { recursive: true });
-    import_fs16.default.writeFileSync(LINUX_SVC_FILE, unit, "utf8");
+    import_fs17.default.mkdirSync(LINUX_SVC_DIR, { recursive: true });
+    import_fs17.default.writeFileSync(LINUX_SVC_FILE, unit, "utf8");
     (0, import_child_process.execSync)("systemctl --user daemon-reload", { stdio: "pipe" });
     (0, import_child_process.execSync)(`systemctl --user enable ${LINUX_SVC}`, { stdio: "pipe" });
     (0, import_child_process.execSync)(`systemctl --user start ${LINUX_SVC}`, { stdio: "pipe" });
@@ -15573,7 +15684,7 @@ function uninstallLinux() {
       (0, import_child_process.execSync)(`systemctl --user disable ${LINUX_SVC}`, { stdio: "pipe" });
     } catch {
     }
-    if (import_fs16.default.existsSync(LINUX_SVC_FILE)) import_fs16.default.unlinkSync(LINUX_SVC_FILE);
+    if (import_fs17.default.existsSync(LINUX_SVC_FILE)) import_fs17.default.unlinkSync(LINUX_SVC_FILE);
     try {
       (0, import_child_process.execSync)("systemctl --user daemon-reload", { stdio: "pipe" });
     } catch {
@@ -15584,7 +15695,7 @@ function uninstallLinux() {
   }
 }
 function isLinuxInstalled() {
-  return import_fs16.default.existsSync(LINUX_SVC_FILE);
+  return import_fs17.default.existsSync(LINUX_SVC_FILE);
 }
 function isInstalled() {
   if (process.platform === "darwin") return isMacInstalled();
@@ -15837,7 +15948,7 @@ async function cmdScan(opts = {}) {
   }
   for (const et of EXTRA_TOOLS) {
     const p = PATHS[et.pathKey];
-    if (p && import_fs17.default.existsSync(p)) {
+    if (p && import_fs18.default.existsSync(p)) {
       console.log(`  ${source_default.green("\u2705")}  ${source_default.cyan(et.label.padEnd(16))} ${source_default.gray("detected")}`);
     }
   }
@@ -16013,7 +16124,7 @@ async function cmdScan(opts = {}) {
     });
     const reportPath = import_path14.default.join(process.cwd(), "detection-report.json");
     const json = JSON.stringify(report, null, 2);
-    import_fs17.default.writeFileSync(reportPath, json, "utf8");
+    import_fs18.default.writeFileSync(reportPath, json, "utf8");
     const kb = Math.round(json.length / 1024);
     console.log(`  ${source_default.gray("Report saved to")} ${source_default.cyan("detection-report.json")}  ${source_default.gray("(" + kb + " KB)")}`);
   } catch {
@@ -16415,7 +16526,7 @@ function cmdAnalyze(opts) {
   const report = runAnalysis();
   const json = JSON.stringify(report, null, 2);
   if (opts.output) {
-    import_fs17.default.writeFileSync(opts.output, json, "utf8");
+    import_fs18.default.writeFileSync(opts.output, json, "utf8");
     console.error(source_default.green(`Report written to ${opts.output}`));
   } else {
     console.log(json);

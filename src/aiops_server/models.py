@@ -147,6 +147,7 @@ class DailyUsage(BaseModel):
     input_tokens: int
     output_tokens: int
     cache_tokens: int = 0
+    session_count: int = 0
 
 
 class DailyToolRow(BaseModel):

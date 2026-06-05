@@ -133,7 +133,8 @@ async def developer_detail(
                SUM(cost_millicents)::bigint AS cost_millicents,
                SUM(input_tokens)::bigint    AS input_tokens,
                SUM(output_tokens)::bigint   AS output_tokens,
-               SUM(cache_read_tokens + cache_write_tokens)::bigint AS cache_tokens
+               SUM(cache_read_tokens + cache_write_tokens)::bigint AS cache_tokens,
+               GREATEST(SUM(session_count), COUNT(*))::int AS session_count
         FROM   usage
         WHERE  user_id = $1 AND date >= CURRENT_DATE - $2::integer
         GROUP  BY date
@@ -223,6 +224,7 @@ async def developer_detail(
                 input_tokens=r["input_tokens"],
                 output_tokens=r["output_tokens"],
                 cache_tokens=r["cache_tokens"],
+                session_count=r["session_count"],
             )
             for r in daily_rows
         ],
