@@ -3,7 +3,7 @@ import { api } from '../api'
 import type { OrgOverviewResponse, DevSummaryItem, TaskCategoryItem } from '../types'
 import { formatCost, formatTokens } from '../utils'
 
-const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ec4899']
+const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#06b6d4']
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   claude_code: 'Claude Code',
@@ -119,9 +119,13 @@ export default function OrgOverview() {
   ): TaskCategoryItem[] {
     const MAIN = [
       'code_generation',
+      'testing',
       'configuration',
       'debugging',
+      'automation',
       'research',
+      'analysis',
+      'writing',
     ]
 
     const normalized: Record<string, number> = {
@@ -131,6 +135,8 @@ export default function OrgOverview() {
       debugging:       0,
       automation:      0,
       research:        0,
+      analysis:        0,
+      writing:         0,
       other:           0,
     }
 
@@ -444,7 +450,7 @@ export default function OrgOverview() {
                   {data.task_categories.length === 0 ? (
                     <p className="no-data">No category data yet — run <code>python aiops.py report</code></p>
                   ) : (() => {
-                    const MAIN = ['code_generation','configuration','debugging','research']
+                    const MAIN = ['code_generation','testing','configuration','debugging','automation','research','analysis','writing']
                     const normalized = normalizeCategories(data.task_categories)
                     const mainCats = normalized.filter(c => c.category !== 'other')
                     const otherEntry = normalized.find(c => c.category === 'other')
