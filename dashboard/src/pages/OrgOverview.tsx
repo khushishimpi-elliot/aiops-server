@@ -112,9 +112,6 @@ export default function OrgOverview() {
 
   const MAIN_CATS = ['code_generation', 'debugging', 'configuration', 'testing', 'automation', 'research']
 
-  // Sub-tasks shown inside the Other dropdown (Title Case for display)
-  const OTHER_SUBCATS = ['analysis', 'code review', 'code_review', 'refactoring', 'documentation', 'architecture', 'agentic', 'writing']
-
   const CAT_COLOR_MAP: Record<string, string> = {
     other:           '#FF6600',
     code_generation: '#3b82f6',
@@ -143,15 +140,11 @@ export default function OrgOverview() {
 
     for (const c of cats) {
       const key = c.category.toLowerCase().trim()
-      if (key === 'other') {
-        // raw "other" from backend → absorbed into Other total, not shown as sub-item
-        otherTotal += c.session_count
-      } else if (MAIN_CATS.includes(key)) {
+      if (MAIN_CATS.includes(key)) {
         mainCounts[key] = (mainCounts[key] ?? 0) + c.session_count
-      } else if (OTHER_SUBCATS.includes(key)) {
-        subCounts[key] = (subCounts[key] ?? 0) + c.session_count
-        otherTotal += c.session_count
       } else {
+        // everything else (including raw "other") shown as sub-item so totals match
+        subCounts[key] = (subCounts[key] ?? 0) + c.session_count
         otherTotal += c.session_count
       }
     }
@@ -172,12 +165,11 @@ export default function OrgOverview() {
 
     // Other always last
     if (otherTotal > 0) {
-      const subs = OTHER_SUBCATS
-        .filter(k => subCounts[k] > 0)
-        .map(k => ({
+      const subs = Object.entries(subCounts)
+        .map(([k, count]) => ({
           category:      k,
-          session_count: subCounts[k],
-          pct:           Math.round((subCounts[k] / otherTotal) * 100),
+          session_count: count,
+          pct:           Math.round((count / otherTotal) * 100),
         }))
         .sort((a, b) => b.session_count - a.session_count)
       result.push({
