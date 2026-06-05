@@ -236,7 +236,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
     return {
       label,
       sessions: rows.length,
-      tokens: rows.reduce((s, r) => s + r.input_tokens + r.output_tokens, 0),
+      tokens: rows.reduce((s, r) => s + r.input_tokens + r.output_tokens + (r.cache_tokens ?? 0), 0),
       cost:    rows.reduce((s, r) => s + r.cost_millicents, 0),
     }
   }) : []
@@ -294,7 +294,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                 </div>
                 <div className="drawer-stat">
                   <div className="drawer-stat-label">Total Tokens</div>
-                  <div className="drawer-stat-value">{formatTokens(data.total_input_tokens + data.total_output_tokens)}</div>
+                  <div className="drawer-stat-value">{formatTokens(data.total_input_tokens + data.total_output_tokens + data.total_cache_read_tokens)}</div>
                 </div>
               </div>
 

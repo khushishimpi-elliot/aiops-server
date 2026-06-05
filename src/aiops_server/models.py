@@ -146,6 +146,7 @@ class DailyUsage(BaseModel):
     cost_millicents: int
     input_tokens: int
     output_tokens: int
+    cache_tokens: int = 0
 
 
 class DailyToolRow(BaseModel):

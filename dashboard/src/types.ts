@@ -13,6 +13,7 @@ export interface DailyUsage {
   cost_millicents: number
   input_tokens: number
   output_tokens: number
+  cache_tokens?: number
 }
 
 export interface TaskCategoryItem {

@@ -111,7 +111,11 @@ async def developer_detail(
             COALESCE(SUM(cost_millicents),   0)::bigint AS cost_millicents,
             COALESCE(SUM(input_tokens),      0)::bigint AS input_tokens,
             COALESCE(SUM(output_tokens),     0)::bigint AS output_tokens,
-            COALESCE(SUM(cache_read_tokens), 0)::bigint AS cache_read_tokens
+            -- Full cache = read + write. The agent reports a single cache figure
+            -- that we split 50/50 on ingest; summing both halves restores the
+            -- real total so the dashboard matches `aiops scan`, which counts all
+            -- cache tokens in its totals.
+            COALESCE(SUM(cache_read_tokens + cache_write_tokens), 0)::bigint AS cache_read_tokens
         FROM usage
         WHERE user_id = $1 AND date >= CURRENT_DATE - $2::integer
         """,
@@ -128,7 +132,8 @@ async def developer_detail(
         SELECT date,
                SUM(cost_millicents)::bigint AS cost_millicents,
                SUM(input_tokens)::bigint    AS input_tokens,
-               SUM(output_tokens)::bigint   AS output_tokens
+               SUM(output_tokens)::bigint   AS output_tokens,
+               SUM(cache_read_tokens + cache_write_tokens)::bigint AS cache_tokens
         FROM   usage
         WHERE  user_id = $1 AND date >= CURRENT_DATE - $2::integer
         GROUP  BY date
@@ -217,6 +222,7 @@ async def developer_detail(
                 cost_millicents=r["cost_millicents"],
                 input_tokens=r["input_tokens"],
                 output_tokens=r["output_tokens"],
+                cache_tokens=r["cache_tokens"],
             )
             for r in daily_rows
         ],
