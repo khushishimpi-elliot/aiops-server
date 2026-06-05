@@ -1,6 +1,4 @@
 import { getSessionsSince } from './db.js';
-import { getAllSessions } from '../adapters/index.js';
-import type { SessionRecord } from './types.js';
 
 export interface DailyAggregate {
   date: string;
@@ -30,37 +28,25 @@ function classifyCategory(prompt: string | undefined): string {
 }
 
 export function computeDailyAggregates(days: number): DailyAggregate[] {
-  // Aggregate from the LIVE scan so the synced data matches `aiops scan`
-  // exactly. The persisted DB retains sessions whose source logs have since
-  // been removed, which inflated the dashboard above the live scan total.
-  // Fall back to the DB only when the live scan yields nothing (e.g. the
-  // tool logs are temporarily unreadable) so offline syncs still work.
-  let sessions: SessionRecord[] = [];
+  let sessions: ReturnType<typeof getSessionsSince> = [];
   try {
-    sessions = getAllSessions();
+    sessions = getSessionsSince(days);
   } catch {
-    sessions = [];
-  }
-  if (sessions.length) {
-    const cutoff = Date.now() - days * 86_400_000;
-    sessions = sessions.filter(s => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
-  } else {
-    try {
-      sessions = getSessionsSince(days);
-    } catch {
-      return [];
-    }
+    return [];
   }
 
   const groups = new Map<string, DailyAggregate>();
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   for (const s of sessions) {
     const category = classifyCategory(s.firstPrompt);
-    const key = [s.sessionDate, s.tool, s.model, category].join('|');
+    const date = s.sessionDate || todayStr;
+    const key = [date, s.tool, s.model, category].join('|');
 
     if (!groups.has(key)) {
       groups.set(key, {
-        date:          s.sessionDate || '',
+        date,
         tool:          s.tool || 'unknown',
         model:         s.model || 'unknown',
         category,

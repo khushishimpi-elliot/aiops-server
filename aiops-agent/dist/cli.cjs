@@ -15120,12 +15120,14 @@ function computeDailyAggregates(days) {
     return [];
   }
   const groups = /* @__PURE__ */ new Map();
+  const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   for (const s of sessions) {
     const category = classifyCategory(s.firstPrompt);
-    const key = [s.sessionDate, s.tool, s.model, category].join("|");
+    const date = s.sessionDate || todayStr;
+    const key = [date, s.tool, s.model, category].join("|");
     if (!groups.has(key)) {
       groups.set(key, {
-        date: s.sessionDate || "",
+        date,
         tool: s.tool || "unknown",
         model: s.model || "unknown",
         category,
