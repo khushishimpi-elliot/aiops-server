@@ -16810,18 +16810,7 @@ program.command("sync").description("Send data to company server").option("--day
   openDb();
   const liveSessions = runAllAdapters().flatMap((r) => r.sessions);
   if (liveSessions.length) upsertSessions(liveSessions);
-  let days;
-  if (opts.days) {
-    days = parseInt(opts.days) || 30;
-  } else {
-    const allSessions = getSessionsSince(3650);
-    if (allSessions.length > 0) {
-      const oldest = allSessions[allSessions.length - 1];
-      days = Math.ceil((Date.now() - (oldest.sessionTimestamp || Date.now())) / 864e5) + 1;
-    } else {
-      days = 30;
-    }
-  }
+  const days = opts.days ? parseInt(opts.days) || 3650 : 3650;
   if (dryRun) {
     console.log(source_default.bold("\n  DRY RUN \u2014 nothing will be sent\n"));
   } else {

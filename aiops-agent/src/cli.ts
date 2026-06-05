@@ -1420,19 +1420,13 @@ program
     const liveSessions = runAllAdapters().flatMap(r => r.sessions);
     if (liveSessions.length) upsertSessions(liveSessions);
 
-    // Default: sync from the very first session ever recorded so nothing is missed.
-    let days: number;
-    if (opts.days) {
-      days = parseInt(opts.days) || 30;
-    } else {
-      const allSessions = getSessionsSince(3650);
-      if (allSessions.length > 0) {
-        const oldest = allSessions[allSessions.length - 1];
-        days = Math.ceil((Date.now() - (oldest.sessionTimestamp || Date.now())) / 86400000) + 1;
-      } else {
-        days = 30;
-      }
-    }
+    // Default to full history (10 years) so nothing is ever missed. This must
+    // NOT depend on the local DB — on machines where better-sqlite3 isn't built
+    // the DB is empty, and reading the oldest date from it silently fell back
+    // to 30 days, so older history never reached the dashboard. The aggregator
+    // filters live sessions to this window, and days >= 365 marks it a full
+    // sync so the server reconciles the complete snapshot.
+    const days = opts.days ? (parseInt(opts.days) || 3650) : 3650;
 
     if (dryRun) {
       console.log(chalk.bold('\n  DRY RUN — nothing will be sent\n'));
