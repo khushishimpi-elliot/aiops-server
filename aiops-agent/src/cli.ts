@@ -14,6 +14,8 @@ import { PATHS } from './core/paths.js';
 import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats, getSessionsSince } from './core/db.js';
 import { saveConfig, getMachineId, isEnrolled, loadConfig as _loadConfig } from './core/config.js';
 import { syncToServer } from './core/syncer.js';
+import { startDaemon, isDaemonAlive, stopDaemon, readDaemonPid, LOG_FILE as DAEMON_LOG } from './core/daemon.js';
+import { install as installAutoStart, uninstall as uninstallAutoStart, isInstalled as isAutoStartInstalled } from './core/installer.js';
 
 const VERSION = '1.0.0';
 
@@ -800,6 +802,17 @@ function cmdStatus(): void {
     console.log(chalk.dim('  Server      ') + chalk.yellow('not enrolled'));
     console.log(chalk.dim('  Run         ') + chalk.white('aiops enroll --server URL --token TOKEN'));
   }
+
+  const daemonRunning = isDaemonAlive();
+  const autoStartOn   = isAutoStartInstalled();
+  const daemonPid     = readDaemonPid();
+  console.log();
+  console.log(chalk.bold('Daemon        ') + (daemonRunning
+    ? chalk.green(`running  (PID ${daemonPid})`)
+    : chalk.yellow('stopped')));
+  console.log(chalk.bold('Auto-start    ') + (autoStartOn
+    ? chalk.green('enabled')
+    : chalk.yellow('disabled — run: aiops install')));
   console.log();
 }
 
@@ -1459,65 +1472,64 @@ program
   });
 
 // ── install command ───────────────────────────────────────────────────────────
+// ─── DAEMON COMMAND ──────────────────────────────────────────────────────────
+// Long-running background process: file-watches AI logs and syncs ~2 min after
+// each session ends, plus a periodic full-history sync every 15 min. This is
+// what keeps the dashboard matching real usage without anyone running commands.
+
+program.command('daemon')
+  .description('Run the background sync daemon (normally started automatically by the OS)')
+  .action(async () => {
+    await startDaemon();
+  });
+
 program.command('install')
-  .description('Register AIOps Agent to auto-start on login')
-  .action(() => {
-    const { execSync } = require('child_process');
-    const HOME = os.homedir();
-    const aiopsDir = path.join(HOME, '.aiops');
-    const vbsPath  = path.join(aiopsDir, 'start-daemon.vbs');
-
+  .description('Register the sync daemon to auto-start at login (Mac/Windows/Linux)')
+  .action(async () => {
     console.log();
-    console.log(chalk.cyan('─────────────────────────────────────────────────────'));
-    console.log(chalk.cyan('  AIOps Install') + '  Setting up auto-start...');
-    console.log(chalk.cyan('─────────────────────────────────────────────────────'));
+    divider();
+    console.log(`  ${chalk.bold.cyan('AIOps Install')}  ${chalk.gray('Setting up auto-start...')}`);
+    divider();
     console.log();
 
-    // Ensure .aiops dir exists
-    if (!fs.existsSync(aiopsDir)) fs.mkdirSync(aiopsDir, { recursive: true });
-
-    // Write the VBS launcher
-    const aiopsExe = process.platform === 'win32'
-      ? String(execSync('where aiops', { encoding: 'utf8' }).trim().split('\n')[0]).trim()
-      : 'aiops';
-
-    const vbsContent = [
-      'Set WshShell = CreateObject("WScript.Shell")',
-      `WshShell.Run "cmd /c aiops start >> ""${path.join(aiopsDir, 'daemon.log')}"" 2>&1", 0, False`,
-    ].join('\r\n');
-    fs.writeFileSync(vbsPath, vbsContent, 'utf8');
-
-    if (process.platform !== 'win32') {
-      // macOS / Linux: use launchd / cron fallback
-      console.log(chalk.yellow('  Non-Windows platform — skipping Task Scheduler.'));
-      console.log(chalk.green('  ✔ VBS written (not applicable on this OS).'));
-      return;
+    // Restart cleanly if a daemon is already running an older build
+    if (isDaemonAlive()) {
+      console.log(chalk.dim('  Stopping existing daemon...'));
+      stopDaemon();
+      await new Promise(r => setTimeout(r, 800));
     }
 
-    const taskCmd = `schtasks /create /f /tn "AIOps Agent" /tr "wscript.exe \\"${vbsPath}\\"" /sc onlogon /rl limited /delay 0000:30`;
-
-    let usedRegistry = false;
-    try {
-      execSync(taskCmd, { stdio: 'pipe' });
-      console.log(chalk.green('  ✔ Registered in Task Scheduler ("AIOps Agent")'));
-    } catch {
-      // Task Scheduler blocked (no admin) — fall back to Registry Run key
-      try {
-        const regCmd = `reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "AIOps Agent" /t REG_SZ /d "wscript.exe \\"${vbsPath}\\"" /f`;
-        execSync(regCmd, { stdio: 'pipe' });
-        usedRegistry = true;
-        console.log(chalk.green('  ✔ Registered in Registry Run key (auto-starts on login)'));
-      } catch (regErr) {
-        console.log(chalk.red('  ✗ Install failed: ' + String(regErr)));
-        process.exit(1);
-      }
+    const result = installAutoStart();
+    if (result.ok) {
+      console.log(chalk.green(`  ✅ ${result.message}`));
+      console.log();
+      console.log(chalk.dim(`  Method:  ${result.method}`));
+      console.log(chalk.dim(`  Trigger: on login + immediately`));
+      console.log(chalk.dim(`  Sync:    ~2 min after each session ends, plus every 15 min`));
+      console.log(chalk.dim(`  Logs:    ${DAEMON_LOG}`));
+    } else {
+      console.log(chalk.red(`  ✗ ${result.message}`));
     }
+    console.log();
+    divider();
+    console.log();
+  });
 
+program.command('uninstall')
+  .description('Remove auto-start registration and stop the daemon')
+  .action(async () => {
     console.log();
-    console.log(chalk.cyan('─────────────────────────────────────────────────────'));
-    console.log();
-    console.log('  ' + chalk.green('✔') + ' Auto-start enabled' + (usedRegistry ? chalk.dim(' (via Registry)') : chalk.dim(' (via Task Scheduler)')));
-    console.log('  ' + chalk.dim('Run') + ' ' + chalk.white('aiops start') + chalk.dim(' now to sync immediately.'));
+    if (isDaemonAlive()) {
+      console.log(chalk.dim('  Stopping daemon...'));
+      stopDaemon();
+      await new Promise(r => setTimeout(r, 800));
+    }
+    const result = uninstallAutoStart();
+    if (result.ok) {
+      console.log(chalk.green(`  ✅ ${result.message}`));
+    } else {
+      console.log(chalk.red(`  ✗ ${result.message}`));
+    }
     console.log();
   });
 

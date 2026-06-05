@@ -18,6 +18,11 @@ const DEBOUNCE_MS  = 2 * 60 * 1000;
 const INTERVAL_MS  = 15 * 60 * 1000;
 // Rotate log when it exceeds 500 KB
 const LOG_MAX_BYTES = 500 * 1024;
+// Sync the entire local history every time. Syncing only a recent window left
+// older dates frozen at whatever a past sync stored — the server upserts by
+// (date, tool, model, category) so re-sending old days is cheap and keeps the
+// dashboard exactly matching the local scan over every period.
+const SYNC_DAYS = 3650;
 
 export function daemonLog(msg: string): void {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
@@ -73,7 +78,7 @@ async function scanAndSync(reason: string): Promise<void> {
       daemonLog(`Scanned: ${stats.totalRows} sessions in DB`);
     }
     if (isEnrolled()) {
-      const result = await syncToServer(30, false);
+      const result = await syncToServer(SYNC_DAYS, false);
       if (result.success) {
         daemonLog(`Sync OK — ${result.aggregatesSent} aggregates, ${result.daysIncluded} days`);
       } else {
