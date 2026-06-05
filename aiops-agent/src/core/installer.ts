@@ -106,27 +106,10 @@ const WIN_REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
 const WIN_REG_VAL = 'AIOps Agent';
 const WIN_VBS     = path.join(os.homedir(), '.aiops', 'start-daemon.vbs');
 
-function isWindowsAdmin(): boolean {
-  try {
-    execSync('net session', { stdio: 'pipe', shell: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function installWindows(): InstallResult {
-  if (!isWindowsAdmin()) {
-    return {
-      ok: false,
-      message: `Administrator privileges required.\n\nTo install auto-start on Windows:\n\n` +
-               `1. Press Windows + X and select "Terminal (Admin)" or "Command Prompt (Admin)"\n` +
-               `2. Run: aiops install\n\n` +
-               `Alternatively, right-click on PowerShell and select "Run as administrator"`,
-      method: 'schtasks'
-    };
-  }
-
+  // No admin check: writing to HKCU\...\Run and ~/.aiops never requires
+  // elevation. The earlier schtasks approach needed admin — that's exactly
+  // why we switched to the Registry Run key.
   const { exec, script } = executorArgs();
 
   // VBScript hidden launcher — runs node with no console window (0 = hidden)
@@ -163,17 +146,7 @@ WshShell.Run Chr(34) & "${exec.replace(/\\/g, '\\\\')}" & Chr(34) & " " & Chr(34
 }
 
 function uninstallWindows(): InstallResult {
-  if (!isWindowsAdmin()) {
-    return {
-      ok: false,
-      message: `Administrator privileges required.\n\nTo uninstall auto-start on Windows:\n\n` +
-               `1. Press Windows + X and select "Terminal (Admin)" or "Command Prompt (Admin)"\n` +
-               `2. Run: aiops uninstall\n\n` +
-               `Alternatively, right-click on PowerShell and select "Run as administrator"`,
-      method: 'schtasks'
-    };
-  }
-
+  // No admin check — HKCU registry edits never require elevation.
   const errors: string[] = [];
   try {
     execSync(`reg delete "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /f`, { stdio: 'pipe', shell: true });
