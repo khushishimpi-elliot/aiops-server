@@ -16,6 +16,7 @@ import { saveConfig, getMachineId, isEnrolled, loadConfig as _loadConfig } from 
 import { syncToServer } from './core/syncer.js';
 import { startDaemon, isDaemonAlive, stopDaemon, readDaemonPid, LOG_FILE as DAEMON_LOG } from './core/daemon.js';
 import { install as installAutoStart, uninstall as uninstallAutoStart, isInstalled as isAutoStartInstalled } from './core/installer.js';
+import { checkAndUpdate } from './core/updater.js';
 
 const VERSION = '1.0.0';
 
@@ -1481,6 +1482,31 @@ program.command('daemon')
   .description('Run the background sync daemon (normally started automatically by the OS)')
   .action(async () => {
     await startDaemon();
+  });
+
+program.command('update')
+  .description('Update the agent to the latest version from your company server')
+  .action(async () => {
+    console.log();
+    console.log(chalk.dim('  Checking for updates...'));
+    const r = await checkAndUpdate();
+    if (r.updated) {
+      console.log(chalk.green('  ✅ Updated to the latest version'));
+      // Restart the daemon so the new code is live immediately
+      if (isDaemonAlive()) {
+        stopDaemon();
+        await new Promise(res => setTimeout(res, 800));
+        const result = installAutoStart();
+        if (result.ok) console.log(chalk.dim('  Daemon restarted on the new version'));
+      }
+    } else if (r.reason === 'up to date') {
+      console.log(chalk.green('  ✅ Already on the latest version'));
+    } else if (r.reason === 'not enrolled') {
+      console.log(chalk.yellow('  Not enrolled — run: aiops enroll --server URL'));
+    } else {
+      console.log(chalk.yellow(`  Could not update: ${r.reason ?? 'unknown'}`));
+    }
+    console.log();
   });
 
 program.command('install')

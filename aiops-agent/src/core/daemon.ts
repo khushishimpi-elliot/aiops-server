@@ -7,6 +7,7 @@ import { syncToServer } from './syncer.js';
 import { watchAll } from './watcher.js';
 import { logError } from './logger.js';
 import { isEnrolled } from './config.js';
+import { checkAndUpdate } from './updater.js';
 
 const AIOPS_DIR  = path.join(os.homedir(), '.aiops');
 const PID_FILE   = path.join(AIOPS_DIR, 'daemon.pid');
@@ -93,6 +94,28 @@ async function scanAndSync(reason: string): Promise<void> {
   }
 }
 
+async function autoUpdate(reason: string): Promise<void> {
+  try {
+    const r = await checkAndUpdate({ silent: true });
+    if (r.updated) {
+      daemonLog(`Self-update (${reason}): bundle replaced — restarting to apply`);
+      // Re-exec so the new code takes effect immediately. The OS auto-start
+      // entry will also relaunch us if this exit races, so either path works.
+      try { fs.unlinkSync(PID_FILE); } catch { /* ignore */ }
+      const { spawn } = await import('child_process');
+      const child = spawn(process.execPath, [process.argv[1], 'daemon'], {
+        detached: true, stdio: 'ignore', windowsHide: true,
+      });
+      child.unref();
+      process.exit(0);
+    } else if (r.reason && r.reason !== 'up to date') {
+      daemonLog(`Self-update check (${reason}): ${r.reason}`);
+    }
+  } catch (err) {
+    daemonLog(`Self-update check failed: ${(err as Error).message}`);
+  }
+}
+
 export async function startDaemon(): Promise<never> {
   fs.mkdirSync(AIOPS_DIR, { recursive: true });
 
@@ -111,6 +134,11 @@ export async function startDaemon(): Promise<never> {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => scanAndSync(reason), DEBOUNCE_MS);
   };
+
+  // Self-update on startup, then once a day, so every machine tracks the
+  // latest agent without anyone needing git access or a manual reinstall.
+  await autoUpdate('startup');
+  const updateId = setInterval(() => autoUpdate('daily'), 24 * 60 * 60 * 1000);
 
   // Run once on startup so the dashboard reflects the latest state immediately
   await scanAndSync('startup');
@@ -134,6 +162,7 @@ export async function startDaemon(): Promise<never> {
   const cleanup = (sig: string) => {
     daemonLog(`${sig} received — stopping`);
     clearInterval(intervalId);
+    clearInterval(updateId);
     if (debounceTimer) clearTimeout(debounceTimer);
     try { fs.unlinkSync(PID_FILE); } catch { /* already gone */ }
     process.exit(0);
