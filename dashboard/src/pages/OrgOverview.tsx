@@ -3,7 +3,6 @@ import { api } from '../api'
 import type { OrgOverviewResponse, DevSummaryItem, TaskCategoryItem } from '../types'
 import { formatCost, formatTokens } from '../utils'
 
-const CAT_COLORS = ['#FF6600','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#06b6d4']
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   claude_code: 'Claude Code',
@@ -23,9 +22,6 @@ function displayToolName(tool: string): string {
   return TOOL_DISPLAY_NAMES[tool.toLowerCase()] ?? tool
 }
 
-function formatCategory(cat: string): string {
-  return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
 
 function nameFromEmail(email: string): string {
   const local = email.split('@')[0]
@@ -114,24 +110,16 @@ export default function OrgOverview() {
 
   const topBarLabel = `Last ${days} days`
 
-  const MAIN_CATS = [
-    'code_generation',
-    'debugging',
-    'configuration',
-    'testing',
-    'research',
-    'automation',
-  ]
+  const MAIN_CATS = ['code_generation', 'debugging', 'configuration', 'testing']
 
-  const OTHER_SUBCATS = [
-    'writing',
-    'analysis',
-    'code review',
-    'refactoring',
-    'documentation',
-    'architecture',
-    'agentic',
-  ]
+  // Fixed color map: other=orange, code_generation=blue, debugging=green, configuration=amber, testing=purple
+  const CAT_COLOR_MAP: Record<string, string> = {
+    other:            '#FF6600',
+    code_generation:  '#3b82f6',
+    debugging:        '#22c55e',
+    configuration:    '#f59e0b',
+    testing:          '#8b5cf6',
+  }
 
   interface NormalizedCategory {
     category:      string
@@ -140,33 +128,43 @@ export default function OrgOverview() {
     sub?:          { category: string; session_count: number; pct: number }[]
   }
 
-  function normalizeCategories(
-    cats: TaskCategoryItem[]
-  ): NormalizedCategory[] {
+  function normalizeCategories(cats: TaskCategoryItem[]): NormalizedCategory[] {
     const mainCounts: Record<string, number> = {}
-    const subCounts:  Record<string, number> = {}
+    const otherSubs:  { category: string; session_count: number }[] = []
     let otherTotal = 0
 
     for (const c of cats) {
       const key = c.category.toLowerCase().trim()
       if (MAIN_CATS.includes(key)) {
         mainCounts[key] = (mainCounts[key] ?? 0) + c.session_count
-      } else if (OTHER_SUBCATS.includes(key)) {
-        subCounts[key] = (subCounts[key] ?? 0) + c.session_count
-        otherTotal += c.session_count
       } else {
+        otherSubs.push({ category: key, session_count: c.session_count })
         otherTotal += c.session_count
       }
     }
 
-    const total = [
-      ...Object.values(mainCounts),
-      otherTotal,
-    ].reduce((a, b) => a + b, 0) || 1
+    const total = [...Object.values(mainCounts), otherTotal].reduce((a, b) => a + b, 0) || 1
 
     const result: NormalizedCategory[] = []
 
-    // Add main categories in order
+    // other always first
+    if (otherTotal > 0) {
+      const subs = otherSubs
+        .sort((a, b) => b.session_count - a.session_count)
+        .map(s => ({
+          category:      s.category,
+          session_count: s.session_count,
+          pct:           Math.round((s.session_count / otherTotal) * 100),
+        }))
+      result.push({
+        category:      'other',
+        session_count: otherTotal,
+        pct:           Math.round((otherTotal / total) * 100),
+        sub:           subs.length > 0 ? subs : undefined,
+      })
+    }
+
+    // then main cats in fixed order
     for (const key of MAIN_CATS) {
       if (mainCounts[key] && mainCounts[key] > 0) {
         result.push({
@@ -175,31 +173,6 @@ export default function OrgOverview() {
           pct:           Math.round((mainCounts[key] / total) * 100),
         })
       }
-    }
-
-    // Add Other last with sub-items (only the specified sub-categories)
-    if (otherTotal > 0) {
-      const subs = OTHER_SUBCATS
-        .filter(k => subCounts[k] && subCounts[k] > 0)
-        .map(k => ({
-          category:      k,
-          session_count: subCounts[k],
-          pct:           0, // pct will be calculated relative to otherTotal
-        }))
-        .sort((a, b) => b.session_count - a.session_count)
-
-      // Calculate percentages for sub-items
-      const subTotal = subs.reduce((sum, s) => sum + s.session_count, 0) || 1
-      subs.forEach(s => {
-        s.pct = Math.round((s.session_count / subTotal) * 100)
-      })
-
-      result.push({
-        category:      'other',
-        session_count: otherTotal,
-        pct:           Math.round((otherTotal / total) * 100),
-        sub:           subs.length > 0 ? subs : undefined,
-      })
     }
 
     return result
@@ -490,105 +463,62 @@ export default function OrgOverview() {
                     <p className="no-data">No category data yet — run <code>python aiops.py report</code></p>
                   ) : (
                     <div className="cat-list">
-                      {normalizeCategories(data.task_categories)
-                        .map((c, i) => (
+                      {normalizeCategories(data.task_categories).map(c => {
+                        const color = CAT_COLOR_MAP[c.category] ?? '#6b7280'
+                        return (
                           <div key={c.category}>
                             <div
                               className="cat-row"
-                              style={{
-                                cursor: c.sub ? 'pointer' : 'default'
-                              }}
-                              onClick={() => {
-                                if (c.sub) setOtherExpanded(e => !e)
-                              }}
+                              style={{ cursor: c.sub ? 'pointer' : 'default' }}
+                              onClick={() => { if (c.sub) setOtherExpanded(e => !e) }}
                             >
                               <div className="cat-meta">
                                 <div className="cat-label-wrap">
-                                  <div
-                                    className="cat-dot"
-                                    style={{
-                                      background: CAT_COLORS[i % CAT_COLORS.length]
-                                    }}
-                                  />
-                                  {formatCategory(c.category)}
+                                  <div className="cat-dot" style={{ background: color }} />
+                                  {c.category}
                                   {c.sub && (
-                                    <span style={{
-                                      marginLeft: 6,
-                                      fontSize:   11,
-                                      color:      'var(--gray-400)',
-                                    }}>
+                                    <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--gray-400)' }}>
                                       {otherExpanded ? '▲' : '▼'}
                                     </span>
                                   )}
                                 </div>
-                                <div style={{
-                                  display:    'flex',
-                                  gap:        10,
-                                  alignItems: 'center',
-                                }}>
-                                  <span style={{
-                                    fontSize: 11,
-                                    color:    'var(--gray-500)',
-                                  }}>
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                  <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>
                                     {c.session_count} sessions
                                   </span>
                                   <div className="cat-pct">{c.pct}%</div>
                                 </div>
                               </div>
                               <div className="cat-track">
-                                <div
-                                  className="cat-fill"
-                                  style={{
-                                    width:      `${c.pct}%`,
-                                    background: CAT_COLORS[i % CAT_COLORS.length],
-                                  }}
-                                />
+                                <div className="cat-fill" style={{ width: `${c.pct}%`, background: color }} />
                               </div>
                             </div>
 
-                            {/* Sub-items dropdown for Other */}
                             {c.sub && otherExpanded && (
                               <div style={{
-                                marginLeft:      16,
-                                marginBottom:     8,
-                                paddingBottom:    8,
-                                borderLeft:       '2px solid var(--gray-200)',
-                                paddingLeft:      12,
+                                marginLeft:   16,
+                                marginBottom: 8,
+                                paddingLeft:  12,
+                                paddingBottom: 4,
+                                borderLeft:   '2px solid var(--gray-200)',
                               }}>
                                 {c.sub.map((s, si) => (
                                   <div
                                     key={s.category}
                                     style={{
                                       display:        'flex',
-                                      alignItems:     'center',
                                       justifyContent: 'space-between',
-                                      padding:        '5px 0',
+                                      alignItems:     'center',
+                                      padding:        '4px 0',
                                       borderBottom:   si < c.sub!.length - 1
                                         ? '1px solid var(--gray-100)'
                                         : 'none',
                                     }}
                                   >
-                                    <span style={{
-                                      fontSize: 12,
-                                      color:    'var(--gray-600)',
-                                      display:  'flex',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                    }}>
-                                      <span style={{
-                                        width:        5,
-                                        height:       5,
-                                        borderRadius: '50%',
-                                        background:   'var(--gray-400)',
-                                        display:      'inline-block',
-                                        flexShrink:   0,
-                                      }} />
-                                      {formatCategory(s.category)}
+                                    <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+                                      {s.category}
                                     </span>
-                                    <span style={{
-                                      fontSize: 11,
-                                      color:    'var(--gray-400)',
-                                    }}>
+                                    <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>
                                       {s.session_count} sessions
                                     </span>
                                   </div>
@@ -596,7 +526,8 @@ export default function OrgOverview() {
                               </div>
                             )}
                           </div>
-                        ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
