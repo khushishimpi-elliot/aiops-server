@@ -103,7 +103,12 @@ function avatarLetter(email: string): string {
 
 function isActive(lastActive: string | null): boolean {
   if (!lastActive) return false
-  return Date.now() - new Date(lastActive).getTime() < 7 * 24 * 60 * 60 * 1000
+  const lastActiveTime = new Date(lastActive).getTime()
+  const now = Date.now()
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+  const dayDiffMs = now - lastActiveTime
+  // Handle future dates (timezone issues) by checking if within 7 days either direction
+  return Math.abs(dayDiffMs) < sevenDaysMs
 }
 
 
