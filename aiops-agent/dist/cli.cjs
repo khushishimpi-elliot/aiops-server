@@ -15161,7 +15161,10 @@ function computeDailyAggregates(days) {
     g.cache_tokens += (s.cacheReadTokens || 0) + (s.cacheWriteTokens || 0);
     g.cost_usd += s.costUSD || 0;
   }
-  return Array.from(groups.values()).filter((g) => g.date).sort((a, b) => b.date.localeCompare(a.date));
+  return Array.from(groups.values()).filter((g) => g.sessions > 0).map((g) => ({
+    ...g,
+    date: g.date || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
+  })).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // src/core/syncer.ts
@@ -15705,7 +15708,6 @@ function isInstalled() {
 
 // src/cli.ts
 var VERSION = "1.0.0";
-var FULL_HISTORY_DAYS = 3650;
 function fmtTokens(n) {
   if (n <= 0) return "\u2014";
   if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -16570,17 +16572,23 @@ async function cmdStart() {
   }
   let syncOk = false;
   if (enrolled) {
-    try {
-      console.log(source_default.white("  Syncing data to company server..."));
-      const result = await syncToServer(FULL_HISTORY_DAYS, false);
-      if (result.success) {
-        syncOk = true;
-        console.log(source_default.green("  \u2705 Data synced to server"));
-      } else {
+    const daemonRunning = isDaemonAlive();
+    if (daemonRunning) {
+      console.log(source_default.dim("  \u2139 Daemon is running \u2014 sync will happen automatically every 15 min"));
+      syncOk = true;
+    } else {
+      try {
+        console.log(source_default.white("  Syncing data to company server..."));
+        const result = await syncToServer(28, false);
+        if (result.success) {
+          syncOk = true;
+          console.log(source_default.green("  \u2705 Data synced to server"));
+        } else {
+          console.log(source_default.yellow("  \u26A0 Sync failed \u2014 data saved locally, will retry next time"));
+        }
+      } catch {
         console.log(source_default.yellow("  \u26A0 Sync failed \u2014 data saved locally, will retry next time"));
       }
-    } catch {
-      console.log(source_default.yellow("  \u26A0 Sync failed \u2014 data saved locally, will retry next time"));
     }
     console.log();
   } else {
@@ -16636,41 +16644,8 @@ async function cmdStart() {
   divider();
   console.log();
 }
-async function watchTick() {
-  const ts = (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  try {
-    openDb();
-    const liveSessions = runAllAdapters().flatMap((r) => r.sessions);
-    if (liveSessions.length) upsertSessions(liveSessions);
-    const total = isAvailable() ? getDbStats().totalRows : liveSessions.length;
-    if (isEnrolled()) {
-      const result = await syncToServer(FULL_HISTORY_DAYS, false);
-      if (result.success) {
-        console.log(source_default.gray(`  [${ts}] `) + source_default.green("\u2713") + source_default.white(` ${total} sessions \u2014 synced ${result.aggregatesSent} aggregates (${result.daysIncluded} days)`));
-      } else {
-        console.log(source_default.gray(`  [${ts}] `) + source_default.yellow("\u26A0") + source_default.white(` ${total} sessions \u2014 sync failed: ${result.error ?? "unknown"}`));
-      }
-    } else {
-      console.log(source_default.gray(`  [${ts}] `) + source_default.white(`${total} sessions saved locally`) + source_default.dim(" (not enrolled \u2014 no sync)"));
-    }
-  } catch (err) {
-    console.log(source_default.gray(`  [${ts}] `) + source_default.yellow("\u26A0 tick failed: " + err.message));
-  }
-}
-async function cmdWatch(opts) {
-  const minutes = Math.max(1, parseInt(opts.interval ?? "5") || 5);
-  console.log();
-  console.log(`  ${source_default.bold.cyan("AIOps Watch")}  ${source_default.gray("v" + VERSION)}`);
-  console.log(source_default.dim(`  Scanning + syncing every ${minutes} min. Press Ctrl+C to stop.`));
-  console.log();
-  await watchTick();
-  setInterval(() => {
-    void watchTick();
-  }, minutes * 6e4);
-}
 program.name("aiops").version(VERSION).description("Monitor AI coding tool usage and costs");
 program.command("start").description("Scan, save and sync everything (recommended)").action(() => cmdStart());
-program.command("watch").description("Keep scanning and syncing to the server continuously (real-time mode)").option("-i, --interval <minutes>", "minutes between scans", "5").action((opts) => cmdWatch(opts));
 program.command("scan").description("Scan AI tools on this machine").option("--json", "Output machine-readable JSON instead of formatted report").action((opts) => cmdScan(opts));
 program.command("summary").description("Alias for scan").action(cmdSummary);
 program.command("report").description("Show usage report (default: today)").option("-w, --weekly", "Weekly report").option("-m, --monthly", "Monthly report").option("-y, --yearly", "Yearly report").action((opts) => {
@@ -16837,17 +16812,17 @@ program.command("enroll").description("Connect to company server with your work 
   console.log(source_default.dim("  Run aiops sync to send your data"));
   console.log();
 });
-program.command("sync").description("Send data to company server").option("--days <n>", "How many days of data to send (default: full history)", String(FULL_HISTORY_DAYS)).option("--dry-run", "Preview what would be sent without sending").action(async (opts) => {
+program.command("sync").description("Send data to company server").option("--days <n>", "How many days of data to send").option("--dry-run", "Preview what would be sent without sending").action(async (opts) => {
   if (!isEnrolled()) {
     console.log(source_default.yellow("\n  Not enrolled yet."));
     console.log(source_default.dim("  Run: aiops enroll --server URL --token TOKEN\n"));
     return;
   }
-  const days = parseInt(opts.days ?? String(FULL_HISTORY_DAYS)) || FULL_HISTORY_DAYS;
   const dryRun = !!opts.dryRun;
   openDb();
   const liveSessions = runAllAdapters().flatMap((r) => r.sessions);
   if (liveSessions.length) upsertSessions(liveSessions);
+  const days = opts.days ? parseInt(opts.days) || 3650 : 3650;
   if (dryRun) {
     console.log(source_default.bold("\n  DRY RUN \u2014 nothing will be sent\n"));
   } else {
@@ -16888,10 +16863,31 @@ program.command("sync").description("Send data to company server").option("--day
   console.log(source_default.dim("  No prompts  ") + "raw text never leaves your machine");
   console.log();
 });
-program.command("daemon").description("Run background sync daemon (normally started automatically by the OS)").action(async () => {
+program.command("daemon").description("Run the background sync daemon (normally started automatically by the OS)").action(async () => {
   await startDaemon();
 });
-program.command("install").description("Register daemon to auto-start at login (Mac: launchd | Windows: Task Scheduler | Linux: systemd)").action(async () => {
+program.command("update").description("Update the agent to the latest version from your company server").action(async () => {
+  console.log();
+  console.log(source_default.dim("  Checking for updates..."));
+  const r = await checkAndUpdate();
+  if (r.updated) {
+    console.log(source_default.green("  \u2705 Updated to the latest version"));
+    if (isDaemonAlive()) {
+      stopDaemon();
+      await new Promise((res) => setTimeout(res, 800));
+      const result = install();
+      if (result.ok) console.log(source_default.dim("  Daemon restarted on the new version"));
+    }
+  } else if (r.reason === "up to date") {
+    console.log(source_default.green("  \u2705 Already on the latest version"));
+  } else if (r.reason === "not enrolled") {
+    console.log(source_default.yellow("  Not enrolled \u2014 run: aiops enroll --server URL"));
+  } else {
+    console.log(source_default.yellow(`  Could not update: ${r.reason ?? "unknown"}`));
+  }
+  console.log();
+});
+program.command("install").description("Register the sync daemon to auto-start at login (Mac/Windows/Linux)").action(async () => {
   console.log();
   divider();
   console.log(`  ${source_default.bold.cyan("AIOps Install")}  ${source_default.gray("Setting up auto-start...")}`);

@@ -89,6 +89,10 @@ export function computeDailyAggregates(days: number): DailyAggregate[] {
   }
 
   return Array.from(groups.values())
-    .filter(g => g.date)
+    .filter(g => g.sessions > 0)
+    .map(g => ({
+      ...g,
+      date: g.date || new Date().toISOString().slice(0, 10),
+    }))
     .sort((a, b) => b.date.localeCompare(a.date));
 }
