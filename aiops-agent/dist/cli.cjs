@@ -15585,29 +15585,7 @@ function isMacInstalled() {
 var WIN_REG_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 var WIN_REG_VAL = "AIOps Agent";
 var WIN_VBS = import_path13.default.join(import_os7.default.homedir(), ".aiops", "start-daemon.vbs");
-function isWindowsAdmin() {
-  try {
-    (0, import_child_process.execSync)("net session", { stdio: "pipe", shell: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
 function installWindows() {
-  if (!isWindowsAdmin()) {
-    return {
-      ok: false,
-      message: `Administrator privileges required.
-
-To install auto-start on Windows:
-
-1. Press Windows + X and select "Terminal (Admin)" or "Command Prompt (Admin)"
-2. Run: aiops install
-
-Alternatively, right-click on PowerShell and select "Run as administrator"`,
-      method: "schtasks"
-    };
-  }
   const { exec, script } = executorArgs();
   const vbs = `Set WshShell = CreateObject("WScript.Shell")
 WshShell.Run Chr(34) & "${exec.replace(/\\/g, "\\\\")}" & Chr(34) & " " & Chr(34) & "${script.replace(/\\/g, "\\\\")}" & Chr(34) & " daemon", 0, False
@@ -15637,20 +15615,6 @@ WshShell.Run Chr(34) & "${exec.replace(/\\/g, "\\\\")}" & Chr(34) & " " & Chr(34
   return { ok: true, message: `Registered in Registry Run key ("${WIN_REG_VAL}")`, method: "registry" };
 }
 function uninstallWindows() {
-  if (!isWindowsAdmin()) {
-    return {
-      ok: false,
-      message: `Administrator privileges required.
-
-To uninstall auto-start on Windows:
-
-1. Press Windows + X and select "Terminal (Admin)" or "Command Prompt (Admin)"
-2. Run: aiops uninstall
-
-Alternatively, right-click on PowerShell and select "Run as administrator"`,
-      method: "schtasks"
-    };
-  }
   const errors = [];
   try {
     (0, import_child_process.execSync)(`reg delete "${WIN_REG_KEY}" /v "${WIN_REG_VAL}" /f`, { stdio: "pipe", shell: true });
