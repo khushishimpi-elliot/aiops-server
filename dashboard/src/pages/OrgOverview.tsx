@@ -119,10 +119,8 @@ export default function OrgOverview() {
   ): TaskCategoryItem[] {
     const MAIN = [
       'code_generation',
-      'testing',
       'configuration',
       'debugging',
-      'automation',
       'research',
     ]
 
@@ -446,7 +444,7 @@ export default function OrgOverview() {
                   {data.task_categories.length === 0 ? (
                     <p className="no-data">No category data yet — run <code>python aiops.py report</code></p>
                   ) : (() => {
-                    const MAIN = ['code_generation','testing','configuration','debugging','automation','research']
+                    const MAIN = ['code_generation','configuration','debugging','research']
                     const normalized = normalizeCategories(data.task_categories)
                     const mainCats = normalized.filter(c => c.category !== 'other')
                     const otherEntry = normalized.find(c => c.category === 'other')

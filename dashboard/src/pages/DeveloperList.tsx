@@ -51,7 +51,6 @@ function normalizeCategories(
 ): { category: string; session_count: number; pct: number }[] {
   const MAIN = [
     'code_generation',
-    'testing',
     'configuration',
     'debugging',
     'research',
@@ -324,7 +323,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
 
               {/* Tasks AI Used For */}
               {data.task_categories.length > 0 && (() => {
-                const MAIN = ['code_generation','testing','configuration','debugging','research']
+                const MAIN = ['code_generation','configuration','debugging','research']
                 const normalized = normalizeCategories(data.task_categories || [])
                 const mainCats = normalized.filter(c => c.category !== 'other')
                 const otherEntry = normalized.find(c => c.category === 'other')
