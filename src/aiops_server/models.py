@@ -98,6 +98,7 @@ class AgentSyncRequest(BaseModel):
     hostname: str | None = None
     os: str | None = None
     sent_at: str | None = None
+    full_sync: bool = False  # if True, payload is the complete history snapshot
     aggregates: list[AgentAggregateItem]
 
 

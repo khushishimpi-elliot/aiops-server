@@ -14063,6 +14063,9 @@ function runAllAdapters() {
   }
   return results;
 }
+function getAllSessions() {
+  return runAllAdapters().flatMap((r) => r.sessions);
+}
 function pathExists(id) {
   try {
     switch (id) {
@@ -15115,9 +15118,19 @@ function classifyCategory(prompt) {
 function computeDailyAggregates(days) {
   let sessions = [];
   try {
-    sessions = getSessionsSince(days);
+    sessions = getAllSessions();
   } catch {
-    return [];
+    sessions = [];
+  }
+  if (sessions.length) {
+    const cutoff = Date.now() - days * 864e5;
+    sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
+  } else {
+    try {
+      sessions = getSessionsSince(days);
+    } catch {
+      return [];
+    }
   }
   const groups = /* @__PURE__ */ new Map();
   for (const s of sessions) {
@@ -15183,12 +15196,14 @@ async function syncToServer(days, dryRun) {
       preview: aggregates
     };
   }
+  const fullSync = days >= 365;
   const payload = {
     enrollment_token: config.enrollmentToken,
     machine_id: config.machineId || getMachineId(),
     hostname: import_os5.default.hostname(),
     os: process.platform,
     sent_at: (/* @__PURE__ */ new Date()).toISOString(),
+    full_sync: fullSync,
     aggregates: aggregates.map((a) => ({
       date: a.date,
       tool: a.tool,

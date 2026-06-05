@@ -234,32 +234,62 @@ async def agent_sync(
         # reclassification, and old token-based idempotency keys, all of which
         # left stale rows behind that inflated dashboard counts.
         dates = sorted(payload_dates)
-        # Remove stale rows for covered dates from any device that shares
-        # the same user + machine_id (handles re-enrollment duplicates).
-        await conn.execute(
-            """
-            DELETE FROM usage u
-            USING devices d, devices me
-            WHERE me.id = $1
-              AND d.user_id = me.user_id AND d.machine_id = me.machine_id
-              AND u.device_id = d.id
-              AND u.date = ANY($2::date[])
-              AND u.idempotency_key != ALL($3::text[])
-            """,
-            device_id, dates, usage_ikeys,
-        )
-        await conn.execute(
-            """
-            DELETE FROM usage_categories u
-            USING devices d, devices me
-            WHERE me.id = $1
-              AND d.user_id = me.user_id AND d.machine_id = me.machine_id
-              AND u.device_id = d.id
-              AND u.date = ANY($2::date[])
-              AND u.idempotency_key != ALL($3::text[])
-            """,
-            device_id, dates, category_ikeys,
-        )
+        # Remove stale rows from any device that shares the same user +
+        # machine_id (handles re-enrollment duplicates). For a full_sync the
+        # payload is the authoritative snapshot of the machine's ENTIRE
+        # history, so we drop every stored row not in this payload regardless
+        # of date — this clears sessions whose source logs were deleted and
+        # dates that dropped out of the snapshot. For a narrow (partial) sync
+        # we only reconcile the dates the payload actually covers, so older
+        # history outside the window is never touched.
+        if body.full_sync and usage_ikeys:
+            await conn.execute(
+                """
+                DELETE FROM usage u
+                USING devices d, devices me
+                WHERE me.id = $1
+                  AND d.user_id = me.user_id AND d.machine_id = me.machine_id
+                  AND u.device_id = d.id
+                  AND u.idempotency_key != ALL($2::text[])
+                """,
+                device_id, usage_ikeys,
+            )
+            await conn.execute(
+                """
+                DELETE FROM usage_categories u
+                USING devices d, devices me
+                WHERE me.id = $1
+                  AND d.user_id = me.user_id AND d.machine_id = me.machine_id
+                  AND u.device_id = d.id
+                  AND u.idempotency_key != ALL($2::text[])
+                """,
+                device_id, category_ikeys or [""],
+            )
+        else:
+            await conn.execute(
+                """
+                DELETE FROM usage u
+                USING devices d, devices me
+                WHERE me.id = $1
+                  AND d.user_id = me.user_id AND d.machine_id = me.machine_id
+                  AND u.device_id = d.id
+                  AND u.date = ANY($2::date[])
+                  AND u.idempotency_key != ALL($3::text[])
+                """,
+                device_id, dates, usage_ikeys,
+            )
+            await conn.execute(
+                """
+                DELETE FROM usage_categories u
+                USING devices d, devices me
+                WHERE me.id = $1
+                  AND d.user_id = me.user_id AND d.machine_id = me.machine_id
+                  AND u.device_id = d.id
+                  AND u.date = ANY($2::date[])
+                  AND u.idempotency_key != ALL($3::text[])
+                """,
+                device_id, dates, category_ikeys,
+            )
 
     stored = len(usage_rows)
 

@@ -54,12 +54,19 @@ export async function syncToServer(
     };
   }
 
+  // A full-history sync (large window) is the authoritative snapshot of this
+  // machine's entire usage, so the server may remove any stored row that isn't
+  // in this payload. A narrow window must NOT trigger that — it would wipe
+  // older history outside the window.
+  const fullSync = days >= 365;
+
   const payload = {
     enrollment_token: config.enrollmentToken,
     machine_id:       config.machineId || getMachineId(),
     hostname:         os.hostname(),
     os:               process.platform,
     sent_at:          new Date().toISOString(),
+    full_sync:        fullSync,
     aggregates: aggregates.map(a => ({
       date:          a.date,
       tool:          a.tool,
