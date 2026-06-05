@@ -142,8 +142,10 @@ export default function OrgOverview() {
       const key = c.category.toLowerCase().trim()
       if (MAIN_CATS.includes(key)) {
         mainCounts[key] = (mainCounts[key] ?? 0) + c.session_count
+      } else if (key === 'other') {
+        // raw "other" from backend: count it but don't show as a named sub-item
+        otherTotal += c.session_count
       } else {
-        // everything else (including raw "other") shown as sub-item so totals match
         subCounts[key] = (subCounts[key] ?? 0) + c.session_count
         otherTotal += c.session_count
       }
