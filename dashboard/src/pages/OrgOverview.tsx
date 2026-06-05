@@ -159,7 +159,18 @@ export default function OrgOverview() {
     const total = [...Object.values(mainCounts), otherTotal].reduce((a, b) => a + b, 0) || 1
     const result: NormalizedCategory[] = []
 
-    // Other always first
+    // Main cats first in fixed order
+    for (const key of MAIN_CATS) {
+      if (mainCounts[key] > 0) {
+        result.push({
+          category:      key,
+          session_count: mainCounts[key],
+          pct:           Math.round((mainCounts[key] / total) * 100),
+        })
+      }
+    }
+
+    // Other always last
     if (otherTotal > 0) {
       const subs = OTHER_SUBCATS
         .filter(k => subCounts[k] > 0)
@@ -175,17 +186,6 @@ export default function OrgOverview() {
         pct:           Math.round((otherTotal / total) * 100),
         sub:           subs.length > 0 ? subs : undefined,
       })
-    }
-
-    // Then main cats in fixed order
-    for (const key of MAIN_CATS) {
-      if (mainCounts[key] > 0) {
-        result.push({
-          category:      key,
-          session_count: mainCounts[key],
-          pct:           Math.round((mainCounts[key] / total) * 100),
-        })
-      }
     }
 
     return result
