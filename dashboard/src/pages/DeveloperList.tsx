@@ -324,7 +324,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                 const mainCats = normalized.filter(c => c.category !== 'other')
                 const otherEntry = normalized.find(c => c.category === 'other')
                 const otherSubs = (data.task_categories || [])
-                  .filter(c => !MAIN.includes(c.category.toLowerCase().trim()))
+                  .filter(c => !MAIN.includes(c.category.toLowerCase().trim()) && c.category.toLowerCase().trim() !== 'other')
                   .sort((a, b) => b.session_count - a.session_count)
                 return (
                   <div className="drawer-section">
