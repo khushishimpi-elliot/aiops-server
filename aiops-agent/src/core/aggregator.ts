@@ -99,23 +99,34 @@ function classifyCategory(
 }
 
 export function computeDailyAggregates(days: number): DailyAggregate[] {
-  // Aggregate from the LIVE scan so synced data matches `aiops scan` and works
-  // on machines where better-sqlite3 isn't built (empty DB). Fall back to the
-  // DB only when the live scan yields nothing (offline/unreadable logs).
+  // For large day ranges (≥365 days = full history), prioritize database for
+  // complete history. For small ranges (<365 days), use live scan which is
+  // always current. This ensures sync sends full history, not just recent data.
   let sessions: SessionRecord[] = [];
-  try {
-    sessions = getAllSessions();
-  } catch {
-    sessions = [];
-  }
-  if (sessions.length) {
-    const cutoff = Date.now() - days * 86_400_000;
-    sessions = sessions.filter(s => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
-  } else {
+
+  if (days >= 365) {
+    // Full history: use database which has all stored sessions
     try {
       sessions = getSessionsSince(days);
     } catch {
       return [];
+    }
+  } else {
+    // Partial window: use live scan for recency
+    try {
+      sessions = getAllSessions();
+    } catch {
+      sessions = [];
+    }
+    if (sessions.length) {
+      const cutoff = Date.now() - days * 86_400_000;
+      sessions = sessions.filter(s => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
+    } else {
+      try {
+        sessions = getSessionsSince(days);
+      } catch {
+        return [];
+      }
     }
   }
 

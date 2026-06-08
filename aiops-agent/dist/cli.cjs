@@ -15162,19 +15162,27 @@ function classifyCategory(prompt, tool, turnCount, projectName) {
 }
 function computeDailyAggregates(days) {
   let sessions = [];
-  try {
-    sessions = getAllSessions();
-  } catch {
-    sessions = [];
-  }
-  if (sessions.length) {
-    const cutoff = Date.now() - days * 864e5;
-    sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
-  } else {
+  if (days >= 365) {
     try {
       sessions = getSessionsSince(days);
     } catch {
       return [];
+    }
+  } else {
+    try {
+      sessions = getAllSessions();
+    } catch {
+      sessions = [];
+    }
+    if (sessions.length) {
+      const cutoff = Date.now() - days * 864e5;
+      sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
+    } else {
+      try {
+        sessions = getSessionsSince(days);
+      } catch {
+        return [];
+      }
     }
   }
   const groups = /* @__PURE__ */ new Map();
