@@ -14219,7 +14219,11 @@ function normalizeFromRecord(s) {
     user_turn_count: s.userTurnCount ?? 0,
     first_prompt: s.firstPrompt ?? "",
     dominant_task_category: classifyTask(s.firstPrompt ?? ""),
-    session_duration_minutes: durationMin
+    session_duration_minutes: durationMin,
+    input_tokens: s.inputTokens || 0,
+    output_tokens: s.outputTokens || 0,
+    cache_tokens: (s.cacheReadTokens || 0) + (s.cacheWriteTokens || 0),
+    cost_usd: s.costUSD || 0
   };
 }
 function weekKey(date) {
@@ -14389,6 +14393,13 @@ function runAnalysis() {
     else topics.push("Set measurable goals for AI tool adoption in the next 4 weeks");
   }
   if (dataQualityNotes.length === 0) dataQualityNotes.push("All detected tool paths scanned successfully");
+  let totalInput = 0, totalOutput = 0, totalCache = 0, totalCost = 0;
+  for (const s of allSessions) {
+    totalInput += s.input_tokens ?? 0;
+    totalOutput += s.output_tokens ?? 0;
+    totalCache += s.cache_tokens ?? 0;
+    totalCost += s.cost_usd ?? 0;
+  }
   return {
     report_generated: (/* @__PURE__ */ new Date()).toISOString(),
     period: "last_28_days",
@@ -14425,6 +14436,13 @@ function runAnalysis() {
     readiness_score: readinessScore2,
     top_3_use_cases: top3UseCases,
     recommended_1on1_topics: topics.slice(0, 3),
+    tokens: {
+      input: totalInput,
+      output: totalOutput,
+      cache: totalCache,
+      total: totalInput + totalOutput + totalCache,
+      cost_usd: totalCost
+    },
     data_quality_notes: dataQualityNotes
   };
 }
@@ -15162,27 +15180,19 @@ function classifyCategory(prompt, tool, turnCount, projectName) {
 }
 function computeDailyAggregates(days) {
   let sessions = [];
-  if (days >= 365) {
+  try {
+    sessions = getAllSessions();
+  } catch {
+    sessions = [];
+  }
+  if (sessions.length) {
+    const cutoff = Date.now() - days * 864e5;
+    sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
+  } else {
     try {
       sessions = getSessionsSince(days);
     } catch {
       return [];
-    }
-  } else {
-    try {
-      sessions = getAllSessions();
-    } catch {
-      sessions = [];
-    }
-    if (sessions.length) {
-      const cutoff = Date.now() - days * 864e5;
-      sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
-    } else {
-      try {
-        sessions = getSessionsSince(days);
-      } catch {
-        return [];
-      }
     }
   }
   const groups = /* @__PURE__ */ new Map();

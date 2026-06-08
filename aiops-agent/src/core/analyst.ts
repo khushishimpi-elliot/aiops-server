@@ -21,6 +21,10 @@ interface NormalizedSession {
   first_prompt: string;
   dominant_task_category: string;
   session_duration_minutes: number | null;
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_tokens?: number;
+  cost_usd?: number;
 }
 
 const TASK_CATEGORIES = [
@@ -150,6 +154,10 @@ function normalizeFromRecord(s: SessionRecord): NormalizedSession {
     first_prompt: s.firstPrompt ?? '',
     dominant_task_category: classifyTask(s.firstPrompt ?? ''),
     session_duration_minutes: durationMin,
+    input_tokens: s.inputTokens || 0,
+    output_tokens: s.outputTokens || 0,
+    cache_tokens: (s.cacheReadTokens || 0) + (s.cacheWriteTokens || 0),
+    cost_usd: s.costUSD || 0,
   };
 }
 
@@ -346,6 +354,15 @@ export function runAnalysis(): Record<string, unknown> {
 
   if (dataQualityNotes.length === 0) dataQualityNotes.push('All detected tool paths scanned successfully');
 
+  // ── TOKENS ───────────────────────────────────────────────────────────────────
+  let totalInput = 0, totalOutput = 0, totalCache = 0, totalCost = 0;
+  for (const s of allSessions) {
+    totalInput += s.input_tokens ?? 0;
+    totalOutput += s.output_tokens ?? 0;
+    totalCache += s.cache_tokens ?? 0;
+    totalCost += s.cost_usd ?? 0;
+  }
+
   return {
     report_generated: new Date().toISOString(),
     period: 'last_28_days',
@@ -382,6 +399,13 @@ export function runAnalysis(): Record<string, unknown> {
     readiness_score: readinessScore,
     top_3_use_cases: top3UseCases,
     recommended_1on1_topics: topics.slice(0, 3),
+    tokens: {
+      input: totalInput,
+      output: totalOutput,
+      cache: totalCache,
+      total: totalInput + totalOutput + totalCache,
+      cost_usd: totalCost,
+    },
     data_quality_notes: dataQualityNotes,
   };
 }
