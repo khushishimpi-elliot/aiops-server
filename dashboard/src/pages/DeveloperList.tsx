@@ -80,6 +80,7 @@ function normalizeCategories(
 ): NormalizedCategory[] {
   const topCounts:   Record<string, number> = {}
   const innerCounts: Record<string, number> = {}
+  const unknownCats: {raw: string, sessions: number}[] = []
 
   for (const c of cats) {
     const raw = c.category ?? ''
@@ -90,14 +91,19 @@ function normalizeCategories(
     } else if (INNER_CATS.includes(key)) {
       const label = raw.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
       innerCounts[label] = (innerCounts[label] ?? 0) + c.session_count
-    } else if (key === 'other') {
+    } else if (key === 'other' || key === '') {
       // Raw other → absorb into code_generation (no nested Other)
       topCounts['code_generation'] = (topCounts['code_generation'] ?? 0) + c.session_count
     } else {
-      // Unknown category goes into inner
+      // Unknown category — add to inner AND track for debugging
       const label = raw.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
       innerCounts[label] = (innerCounts[label] ?? 0) + c.session_count
+      unknownCats.push({raw, sessions: c.session_count})
     }
+  }
+
+  if (unknownCats.length > 0) {
+    console.warn('Unknown categories detected:', unknownCats)
   }
 
   const innerTotal = Object.values(innerCounts).reduce((a, b) => a + b, 0)
@@ -117,9 +123,9 @@ function normalizeCategories(
 
   if (innerTotal > 0) {
     const children = Object.entries(innerCounts)
-      .filter(([, n]) => n > 0)
+      .filter(([name, n]) => n > 0 && name.trim().length > 0)
       .map(([category, session_count]) => ({
-        category,
+        category: category || '(Uncategorized)',
         session_count,
       }))
       .sort((a, b) => b.session_count - a.session_count)
