@@ -14101,8 +14101,8 @@ function pathExists(id) {
 var import_fs11 = __toESM(require("fs"), 1);
 var import_path9 = __toESM(require("path"), 1);
 var NOW = Date.now();
-var DAYS_28 = 28 * 24 * 60 * 60 * 1e3;
-var DAYS_30 = 30 * 24 * 60 * 60 * 1e3;
+var DAYS_28 = 365 * 24 * 60 * 60 * 1e3;
+var DAYS_30 = 365 * 24 * 60 * 60 * 1e3;
 var CUTOFF_28 = NOW - DAYS_28;
 var CUTOFF_30 = NOW - DAYS_30;
 function classifyTask(prompt) {
@@ -15180,19 +15180,27 @@ function classifyCategory(prompt, tool, turnCount, projectName) {
 }
 function computeDailyAggregates(days) {
   let sessions = [];
-  try {
-    sessions = getAllSessions();
-  } catch {
-    sessions = [];
-  }
-  if (sessions.length) {
-    const cutoff = Date.now() - days * 864e5;
-    sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
-  } else {
+  if (days >= 365) {
     try {
       sessions = getSessionsSince(days);
     } catch {
       return [];
+    }
+  } else {
+    try {
+      sessions = getAllSessions();
+    } catch {
+      sessions = [];
+    }
+    if (sessions.length) {
+      const cutoff = Date.now() - days * 864e5;
+      sessions = sessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff);
+    } else {
+      try {
+        sessions = getSessionsSince(days);
+      } catch {
+        return [];
+      }
     }
   }
   const groups = /* @__PURE__ */ new Map();
@@ -15931,7 +15939,7 @@ async function cmdScan(opts = {}) {
   openDb();
   const t0 = Date.now();
   const nowMs = Date.now();
-  const cutoff28 = nowMs - 28 * 864e5;
+  const cutoff28 = nowMs - 365 * 864e5;
   const todayStr = today();
   const results = runAllAdapters();
   const _raw = results.flatMap((r) => r.sessions);

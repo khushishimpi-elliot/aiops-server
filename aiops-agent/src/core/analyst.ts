@@ -6,8 +6,8 @@ import { PATHS } from './paths.js';
 import { logError } from './logger.js';
 
 const NOW = Date.now();
-const DAYS_28 = 28 * 24 * 60 * 60 * 1000;
-const DAYS_30 = 30 * 24 * 60 * 60 * 1000;
+const DAYS_28 = 365 * 24 * 60 * 60 * 1000; // Show all-time to match server dashboard
+const DAYS_30 = 365 * 24 * 60 * 60 * 1000; // Show all-time to match server dashboard
 const CUTOFF_28 = NOW - DAYS_28;
 const CUTOFF_30 = NOW - DAYS_30;
 

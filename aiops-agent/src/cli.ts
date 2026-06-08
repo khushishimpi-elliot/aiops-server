@@ -257,7 +257,7 @@ async function cmdScan(opts: { json?: boolean } = {}): Promise<void> {
   openDb();
   const t0 = Date.now();
   const nowMs = Date.now();
-  const cutoff28 = nowMs - 28 * 86400000;
+  const cutoff28 = nowMs - 365 * 86400000; // Show all-time data to match server dashboard
   const todayStr = today();
 
   // 1. Run all adapters — deduplicate by (sessionId, tool) to match DB count
