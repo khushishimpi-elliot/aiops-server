@@ -1514,6 +1514,134 @@ program
     console.log();
   });
 
+// ─── UPDATE COMMAND (pull latest & reinstall) ────────────────────────────────
+
+async function cmdUpdate(): Promise<void> {
+  console.log();
+  divider();
+  console.log(`  ${chalk.bold.cyan('AIOps Update')}  ${chalk.gray('Pulling latest version...')}`);
+  divider();
+  console.log();
+
+  try {
+    const { execSync } = await import('child_process');
+
+    // Try multiple sources to find the git repo
+    let repoRoot: string | null = null;
+    const candidates = [
+      process.env.AIOPS_REPO,
+      path.join(os.homedir(), 'Desktop', 'aiops-server', 'aiops-agent'),
+      path.join(os.homedir(), 'projects', 'aiops-server', 'aiops-agent'),
+      path.join(os.homedir(), 'src', 'aiops-server', 'aiops-agent'),
+      path.join(os.homedir(), 'aiops-server', 'aiops-agent'),
+      process.cwd(),
+      process.argv[1] ? path.dirname(process.argv[1]) : undefined,
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      if (!fs.existsSync(candidate)) continue;
+
+      let searchDir = candidate;
+      for (let i = 0; i < 5; i++) {
+        const pkgPath = path.join(searchDir, 'package.json');
+        if (fs.existsSync(pkgPath)) {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as Record<string, unknown>;
+          if (pkg.name === 'aiops-agent') {
+            repoRoot = searchDir;
+            break;
+          }
+        }
+        const parent = path.dirname(searchDir);
+        if (parent === searchDir) break;
+        searchDir = parent;
+      }
+      if (repoRoot) break;
+    }
+
+    if (!repoRoot) {
+      console.log(chalk.yellow('  ⚠ Could not find aiops-agent repository'));
+      console.log();
+      console.log(chalk.gray('  Set the repository path with:'));
+      console.log(chalk.white('    export AIOPS_REPO=/path/to/aiops-server/aiops-agent'));
+      console.log();
+      console.log(chalk.gray('  Then run: aiops update'));
+      console.log();
+      console.log(chalk.gray('  Or for npm installations, run: npm install -g aiops-agent@latest'));
+      console.log();
+      return;
+    }
+
+    const gitRoot = path.dirname(repoRoot);
+
+    if (!fs.existsSync(path.join(gitRoot, '.git'))) {
+      console.log(chalk.yellow('  ⚠ Not a git repository at: ' + gitRoot));
+      console.log(chalk.gray('  Install from npm instead: npm install -g aiops-agent@latest'));
+      console.log();
+      return;
+    }
+
+    console.log(chalk.dim(`  Repository: ${repoRoot}`));
+    console.log();
+
+    console.log(chalk.white('  Pulling latest changes from main branch...'));
+    try {
+      execSync('git pull origin main', {
+        cwd: gitRoot,
+        stdio: 'pipe',
+      });
+      console.log(chalk.green('  ✅ Latest code pulled'));
+    } catch (e) {
+      console.log(chalk.yellow('  ⚠ Could not pull changes: ' + (e instanceof Error ? e.message : String(e))));
+      console.log(chalk.gray('  You may be offline or have uncommitted changes'));
+    }
+
+    console.log(chalk.white('  Building the latest version...'));
+    try {
+      execSync('npm run build', {
+        cwd: repoRoot,
+        stdio: 'pipe',
+      });
+      console.log(chalk.green('  ✅ Built successfully'));
+    } catch (e) {
+      console.log(chalk.red('  ✗ Build failed: ' + (e instanceof Error ? e.message : String(e))));
+      console.log();
+      divider();
+      console.log();
+      return;
+    }
+
+    console.log(chalk.white('  Installing globally...'));
+    try {
+      execSync('npm install -g . --force', {
+        cwd: repoRoot,
+        stdio: 'pipe',
+      });
+      console.log(chalk.green('  ✅ Installed successfully'));
+    } catch (e) {
+      console.log(chalk.red('  ✗ Install failed: ' + (e instanceof Error ? e.message : String(e))));
+      console.log();
+      divider();
+      console.log();
+      return;
+    }
+
+    console.log();
+    divider();
+    console.log();
+    console.log('  ' + chalk.bold.white('Update complete!'));
+    console.log('  ' + chalk.dim('Run: aiops scan to verify'));
+    console.log();
+    divider();
+    console.log();
+  } catch (err) {
+    console.log(chalk.red('  ✗ Update failed: ' + (err instanceof Error ? err.message : String(err))));
+    console.log();
+    divider();
+    console.log();
+  }
+}
+
 // ─── DAEMON COMMAND ──────────────────────────────────────────────────────────
 
 program.command('daemon')
@@ -1523,6 +1651,12 @@ program.command('daemon')
   });
 
 // ─── INSTALL / UNINSTALL ─────────────────────────────────────────────────────
+
+program.command('update')
+  .description('Update aiops-agent to the latest version from git repository')
+  .action(async () => {
+    await cmdUpdate();
+  });
 
 program.command('install')
   .description('Register daemon to auto-start at login (Mac: launchd | Windows: Task Scheduler | Linux: systemd)')
