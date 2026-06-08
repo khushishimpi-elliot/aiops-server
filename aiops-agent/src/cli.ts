@@ -109,16 +109,81 @@ function shortModel(m: string): string {
     .slice(0, 22);
 }
 
-function classifyTask(prompt: string): string {
-  if (!prompt) return 'other';
-  const p = prompt.toLowerCase();
-  if (/\b(fix|bug|error|issue|broken|crash|exception|debug|failing)\b/.test(p)) return 'debugging';
-  if (/\b(write|create|build|implement|add|generate|make|new)\b/.test(p))        return 'code_generation';
-  if (/\b(explain|what|how|why|understand|describe|analyse|analyze)\b/.test(p))  return 'analysis';
-  if (/\b(test|spec|coverage|mock|unit|jest|pytest)\b/.test(p))                  return 'automation';
-  if (/\b(configure|setup|install|config|settings|init)\b/.test(p))              return 'configuration';
-  if (/\b(research|find|search|look up|lookup)\b/.test(p))                       return 'research';
-  if (/\b(document|readme|draft|write|docs)\b/.test(p))                          return 'writing';
+function classifyTask(
+  prompt: string | undefined,
+  tool?: string,
+  turnCount?: number,
+  projectName?: string,
+): string {
+  const p = (prompt || '').toLowerCase().trim();
+  const proj = (projectName || '').toLowerCase();
+  const t = (tool || '').toLowerCase();
+  const turns = turnCount || 0;
+
+  if (p.length > 3) {
+    if (/\b(bug|fix|error|exception|crash|debug|broken|issue|fail|wrong|not work|undefined|null|traceback|stack trace|cannot|could not|doesn't work|doesn't compile|syntax error|type error|runtime|warning)\b/.test(p))
+      return 'debugging';
+
+    if (/\b(review|check this|look at this|feedback|suggest|improve|optimize|better way|best practice|is this correct|is this right|what do you think|any issues|code quality|clean up|cleanup|lgtm)\b/.test(p))
+      return 'code_review';
+
+    if (/\b(refactor|restructure|reorganize|rename|move|extract|simplify|rewrite|redesign|clean|decouple|modular|modularize|split|separate)\b/.test(p))
+      return 'refactoring';
+
+    if (/\b(test|spec|coverage|mock|unit|jest|pytest|assert|expect|integration|e2e|cypress|vitest|playwright|describe|it should|test case|test suite|tdd|bdd)\b/.test(p))
+      return 'testing';
+
+    if (/\b(document|readme|comment|docstring|jsdoc|wiki|changelog|docs|add docs|write docs|explain this code|what does this do|annotate|summarize)\b/.test(p))
+      return 'documentation';
+
+    if (/\b(config|setup|install|configure|settings|init|environment|env|deploy|docker|kubernetes|helm|ci|cd|pipeline|workflow|nginx|apache|database|db|connection|port|host|url|certificate|ssl|aws|gcp|azure|render|vercel)\b/.test(p))
+      return 'configuration';
+
+    if (/\b(architect|design|structure|pattern|approach|strategy|system design|how should|best approach|which approach|how to organize|folder structure|project structure|database schema|data model|api design|erd|uml)\b/.test(p))
+      return 'architecture';
+
+    if (/\b(what is|what are|how does|how do|explain|tell me|difference between|compare|pros and cons|when to use|which is better|learn|understand|overview|introduction|tutorial|help me understand|can you explain)\b/.test(p))
+      return 'research';
+
+    if (/\b(analyse|analyze|review|audit|assess|evaluate|performance|bottleneck|slow|memory leak|cpu usage|optimize|profil|metrics|monitoring|benchmark)\b/.test(p))
+      return 'analysis';
+
+    if (/\b(automate|automation|script|schedule|cron|workflow|pipeline|batch|process|scaffolding|boilerplate|generate)\b/.test(p))
+      return 'automation';
+
+    if (/\b(write|create|build|implement|add|make|new|function|class|component|module|feature|endpoint|api|route|model|schema|migration|service|controller|handler|hook|helper|utility|util|page|view|widget|button|form|table|chart|dashboard)\b/.test(p))
+      return 'code_generation';
+  }
+
+  if (t === 'copilot')   return 'code_generation';
+  if (t === 'cursor')    return 'code_generation';
+  if (t === 'windsurf')  return 'code_generation';
+  if (t === 'cline')     return 'code_generation';
+  if (t === 'roo')       return 'code_generation';
+  if (t === 'kilo')      return 'code_generation';
+  if (t === 'codex')     return 'code_generation';
+  if (t === 'gemini')    return 'research';
+  if (t === 'pi')        return 'research';
+
+  if (turns >= 50) return 'debugging';
+  if (turns >= 20) return 'code_generation';
+  if (turns >= 10) return 'analysis';
+  if (turns >= 5)  return 'code_generation';
+  if (turns >= 2)  return 'research';
+
+  if (proj.includes('test'))    return 'testing';
+  if (proj.includes('doc'))     return 'documentation';
+  if (proj.includes('config'))  return 'configuration';
+  if (proj.includes('setup'))   return 'configuration';
+  if (proj.includes('deploy'))  return 'configuration';
+  if (proj.includes('infra'))   return 'configuration';
+  if (proj.includes('server'))  return 'code_generation';
+  if (proj.includes('api'))     return 'code_generation';
+  if (proj.includes('frontend'))return 'code_generation';
+  if (proj.includes('backend')) return 'code_generation';
+  if (proj.includes('aiops'))   return 'code_generation';
+  if (proj.includes('dashboard'))return 'code_generation';
+
   return 'other';
 }
 
@@ -242,7 +307,12 @@ async function cmdScan(opts: { json?: boolean } = {}): Promise<void> {
   // ── TASK CATEGORIES ──────────────────────────────────────────────────────────
   const catCounts: Record<string, number> = {};
   for (const s of recent) {
-    const cat = classifyTask(s.firstPrompt ?? '');
+    const cat = classifyTask(
+      s.firstPrompt,
+      s.tool,
+      s.turnCount,
+      s.projectName,
+    );
     catCounts[cat] = (catCounts[cat] ?? 0) + 1;
   }
   const sortedCats = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
