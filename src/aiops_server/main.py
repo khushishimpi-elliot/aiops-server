@@ -16,6 +16,64 @@ from .errors import register_error_handlers
 from .routers import admin, agent, download, enrollment, health, query, telemetry
 
 
+async def _fix_other_categories() -> None:
+    """
+    Re-classify usage_categories rows stored as 'other' using tool from usage table.
+    Runs on every startup — safe to run multiple times (only updates 'other' rows).
+    """
+    import logging
+    from .db import get_pool
+
+    try:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            updated = await conn.fetchval("""
+                WITH tool_data AS (
+                    SELECT
+                        uc.id,
+                        u.tool,
+                        u.model,
+                        COALESCE(
+                            SUM(uc.session_count), 1
+                        ) as turns
+                    FROM usage_categories uc
+                    JOIN usage u ON
+                        u.user_id  = uc.user_id AND
+                        u.date     = uc.date
+                    WHERE uc.category = 'other'
+                    GROUP BY uc.id, u.tool, u.model
+                )
+                UPDATE usage_categories uc
+                SET category = CASE
+                    WHEN td.tool IN (
+                        'copilot','cursor','windsurf',
+                        'cline','roo','kilo','codex'
+                    ) THEN 'code_generation'
+                    WHEN td.tool IN ('gemini','pi')
+                        THEN 'research'
+                    WHEN td.turns >= 50
+                        THEN 'debugging'
+                    WHEN td.turns >= 20
+                        THEN 'code_generation'
+                    WHEN td.turns >= 10
+                        THEN 'analysis'
+                    WHEN td.turns >= 5
+                        THEN 'code_generation'
+                    WHEN td.turns >= 2
+                        THEN 'research'
+                    ELSE 'code_generation'
+                END
+                FROM tool_data td
+                WHERE uc.id = td.id
+                AND   uc.category = 'other'
+                RETURNING 1
+            """)
+            if updated:
+                logging.info(f"Fixed {updated} other categories on startup")
+    except Exception as e:
+        logging.warning(f"Category startup fix skipped: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     import logging
@@ -26,6 +84,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "EMAIL NOT CONFIGURED: Set SMTP_USER and SMTP_PASSWORD in Render environment variables. "
             "OTPs will be logged to console instead."
         )
+
+    # Run category fix on startup
+    await _fix_other_categories()
+
     logging.info("AIOps server started")
     yield
     await close_pool()

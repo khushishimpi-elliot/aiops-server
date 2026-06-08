@@ -35,6 +35,55 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _classify_server_side(
+    category: str | None,
+    tool: str,
+    total_turns: int,
+    model: str | None = None,
+) -> str:
+    """Re-classify sessions on server side for old 'other' rows."""
+    cat = (category or '').lower().strip()
+
+    # Keep already classified sessions
+    if cat and cat not in ('other', ''):
+        return cat
+
+    t = (tool or '').lower()
+    turns = total_turns or 0
+
+    # Tool-based classification
+    if t in ('copilot', 'cursor', 'windsurf', 'cline', 'roo', 'kilo', 'codex'):
+        return 'code_generation'
+    if t in ('gemini', 'pi'):
+        return 'research'
+    if t in ('claude', 'claude_code'):
+        if turns >= 50:
+            return 'debugging'
+        if turns >= 20:
+            return 'code_generation'
+        if turns >= 10:
+            return 'analysis'
+        if turns >= 5:
+            return 'code_generation'
+        if turns >= 2:
+            return 'research'
+        return 'code_generation'
+
+    # Turn count fallback
+    if turns >= 50:
+        return 'debugging'
+    if turns >= 20:
+        return 'code_generation'
+    if turns >= 10:
+        return 'analysis'
+    if turns >= 5:
+        return 'code_generation'
+    if turns >= 2:
+        return 'research'
+
+    return 'code_generation'
+
+
 @router.post("/enroll", response_model=AgentEnrollResponse)
 async def agent_enroll(
     body: AgentEnrollRequest,
@@ -182,12 +231,20 @@ async def agent_sync(
             cost_millicents, agg.sessions, ikey,
         ))
 
-        if agg.category:
+        # Re-classify 'other' sessions using tool and turn count
+        final_category = _classify_server_side(
+            agg.category,
+            agg.tool,
+            agg.total_turns,
+            agg.model,
+        )
+
+        if final_category:
             cat_ikey = hashlib.sha256(f"{ikey}:cat".encode()).hexdigest()[:64]
             category_ikeys.append(cat_ikey)
             category_rows.append((
                 user_id, device_id, parsed_date,
-                agg.category, agg.sessions, cat_ikey,
+                final_category, agg.sessions, cat_ikey,
             ))
 
     # The agent sends CUMULATIVE daily totals recomputed from its full local

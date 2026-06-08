@@ -55,9 +55,8 @@ const MAIN_CATS = [
   'automation',
 ]
 
-const OTHER_SUBCATS = [
+const INNER_CATS = [
   'analysis',
-  'code review',
   'code_review',
   'refactoring',
   'documentation',
@@ -70,70 +69,66 @@ interface NormalizedCategory {
   category:      string
   session_count: number
   pct:           number
-  sub?:          { category: string; session_count: number; pct: number }[]
+  children?: {
+    category:      string
+    session_count: number
+  }[]
 }
 
 function normalizeCategories(
   cats: { category: string; session_count: number; pct: number }[]
 ): NormalizedCategory[] {
-  const mainCounts: Record<string, number> = {}
-  const subCounts:  Record<string, number> = {}
-  let otherTotal = 0
+  const topCounts:   Record<string, number> = {}
+  const innerCounts: Record<string, number> = {}
 
   for (const c of cats) {
-    const key = c.category.toLowerCase().trim()
-    if (key === 'other') {
-      otherTotal += c.session_count
-    } else if (MAIN_CATS.includes(key)) {
-      mainCounts[key] = (mainCounts[key] ?? 0) + c.session_count
-    } else if (OTHER_SUBCATS.includes(key)) {
-      subCounts[key] = (subCounts[key] ?? 0) + c.session_count
-      otherTotal += c.session_count
+    const raw = c.category ?? ''
+    const key = raw.toLowerCase().trim().replace(/[\s-]+/g, '_')
+
+    if (MAIN_CATS.includes(key)) {
+      topCounts[key] = (topCounts[key] ?? 0) + c.session_count
+    } else if (INNER_CATS.includes(key)) {
+      const label = raw.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      innerCounts[label] = (innerCounts[label] ?? 0) + c.session_count
+    } else if (key === 'other') {
+      // Raw other → absorb into code_generation (no nested Other)
+      topCounts['code_generation'] = (topCounts['code_generation'] ?? 0) + c.session_count
     } else {
-      otherTotal += c.session_count
+      // Unknown category goes into inner
+      const label = raw.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      innerCounts[label] = (innerCounts[label] ?? 0) + c.session_count
     }
   }
 
-  const total = [
-    ...Object.values(mainCounts),
-    otherTotal,
-  ].reduce((a, b) => a + b, 0) || 1
+  const innerTotal = Object.values(innerCounts).reduce((a, b) => a + b, 0)
+  const grandTotal = [...Object.values(topCounts), innerTotal].reduce((a, b) => a + b, 0) || 1
 
   const result: NormalizedCategory[] = []
 
-  // Add main categories in order
   for (const key of MAIN_CATS) {
-    if (mainCounts[key] && mainCounts[key] > 0) {
+    if (topCounts[key] && topCounts[key] > 0) {
       result.push({
         category:      key,
-        session_count: mainCounts[key],
-        pct:           Math.round((mainCounts[key] / total) * 100),
+        session_count: topCounts[key],
+        pct:           Math.round((topCounts[key] / grandTotal) * 100),
       })
     }
   }
 
-  // Add Other last with sub-items (only the specified sub-categories)
-  if (otherTotal > 0) {
-    const subs = OTHER_SUBCATS
-      .filter(k => subCounts[k] && subCounts[k] > 0)
-      .map(k => ({
-        category:      k,
-        session_count: subCounts[k],
-        pct:           0, // pct will be calculated relative to otherTotal
+  if (innerTotal > 0) {
+    const children = Object.entries(innerCounts)
+      .filter(([, n]) => n > 0)
+      .map(([category, session_count]) => ({
+        category,
+        session_count,
       }))
       .sort((a, b) => b.session_count - a.session_count)
 
-    // Calculate percentages for sub-items
-    const subTotal = subs.reduce((sum, s) => sum + s.session_count, 0) || 1
-    subs.forEach(s => {
-      s.pct = Math.round((s.session_count / subTotal) * 100)
-    })
-
     result.push({
       category:      'other',
-      session_count: otherTotal,
-      pct:           Math.round((otherTotal / total) * 100),
-      sub:           subs.length > 0 ? subs : undefined,
+      session_count: innerTotal,
+      pct:           Math.round((innerTotal / grandTotal) * 100),
+      children,
     })
   }
 
@@ -381,10 +376,10 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                       <div
                         style={{
                           marginBottom: 10,
-                          cursor: c.sub ? 'pointer' : 'default',
+                          cursor: c.children ? 'pointer' : 'default',
                         }}
                         onClick={() => {
-                          if (c.sub) setOtherExpanded(e => !e)
+                          if (c.children) setOtherExpanded(e => !e)
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -392,7 +387,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                             <div style={{ width: 8, height: 8, borderRadius: '50%', background: CAT_COLORS[i % CAT_COLORS.length], flexShrink: 0 }} />
                             <span style={{ fontSize: 12, color: 'var(--gray-700)' }}>
                               {formatCategory(c.category)}
-                              {c.sub && (
+                              {c.children && (
                                 <span style={{
                                   marginLeft: 6,
                                   fontSize:   11,
@@ -410,8 +405,8 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                         </div>
                       </div>
 
-                      {/* Sub-items for Other */}
-                      {c.sub && otherExpanded && (
+                      {/* Children for Other */}
+                      {c.children && otherExpanded && (
                         <div style={{
                           marginLeft:    8,
                           marginBottom:   10,
@@ -419,7 +414,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                           borderLeft:     '2px solid var(--gray-200)',
                           paddingBottom:  8,
                         }}>
-                          {c.sub.map((s, si) => (
+                          {c.children.map((s, si) => (
                             <div
                               key={s.category}
                               style={{
@@ -427,7 +422,7 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
                                 alignItems:     'center',
                                 justifyContent: 'space-between',
                                 padding:        '5px 0',
-                                borderBottom:   si < c.sub!.length - 1
+                                borderBottom:   si < c.children!.length - 1
                                   ? '1px solid var(--gray-100)'
                                   : 'none',
                               }}

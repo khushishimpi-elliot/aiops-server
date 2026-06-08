@@ -110,7 +110,8 @@ export default function OrgOverview() {
 
   const topBarLabel = `Last ${days} days`
 
-  const MAIN_CATS = ['code_generation', 'debugging', 'configuration', 'testing', 'automation', 'research']
+  const TOP_CATS = ['code_generation', 'debugging', 'configuration', 'automation', 'research', 'testing']
+  const INNER_CATS = ['analysis', 'writing', 'code_review', 'refactoring', 'documentation', 'architecture', 'agentic']
 
   const CAT_COLOR_MAP: Record<string, string> = {
     other:           '#FF6600',
@@ -126,59 +127,68 @@ export default function OrgOverview() {
     return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
-  interface NormalizedCategory {
+  interface CatItem {
     category:      string
     session_count: number
     pct:           number
-    sub?:          { category: string; session_count: number; pct: number }[]
+    children?: {
+      category:      string
+      session_count: number
+    }[]
   }
 
-  function normalizeCategories(cats: TaskCategoryItem[]): NormalizedCategory[] {
-    const mainCounts: Record<string, number> = {}
-    const subCounts:  Record<string, number> = {}
-    let otherTotal = 0
+  function normalizeCategories(cats: TaskCategoryItem[]): CatItem[] {
+    const topCounts:   Record<string, number> = {}
+    const innerCounts: Record<string, number> = {}
 
     for (const c of cats) {
-      const key = c.category.toLowerCase().trim()
-      if (MAIN_CATS.includes(key)) {
-        mainCounts[key] = (mainCounts[key] ?? 0) + c.session_count
+      const raw = c.category ?? ''
+      const key = raw.toLowerCase().trim().replace(/[\s-]+/g, '_')
+
+      if (TOP_CATS.includes(key)) {
+        topCounts[key] = (topCounts[key] ?? 0) + c.session_count
+      } else if (INNER_CATS.includes(key)) {
+        const label = raw.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        innerCounts[label] = (innerCounts[label] ?? 0) + c.session_count
       } else if (key === 'other') {
-        // raw "other" from backend: count it but don't show as a named sub-item
-        otherTotal += c.session_count
+        // Raw other → absorb into code_generation (no nested Other)
+        topCounts['code_generation'] = (topCounts['code_generation'] ?? 0) + c.session_count
       } else {
-        subCounts[key] = (subCounts[key] ?? 0) + c.session_count
-        otherTotal += c.session_count
+        // Unknown category goes into inner
+        const label = raw.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        innerCounts[label] = (innerCounts[label] ?? 0) + c.session_count
       }
     }
 
-    const total = [...Object.values(mainCounts), otherTotal].reduce((a, b) => a + b, 0) || 1
-    const result: NormalizedCategory[] = []
+    const innerTotal = Object.values(innerCounts).reduce((a, b) => a + b, 0)
+    const grandTotal = [...Object.values(topCounts), innerTotal].reduce((a, b) => a + b, 0) || 1
 
-    // Main cats first in fixed order
-    for (const key of MAIN_CATS) {
-      if (mainCounts[key] > 0) {
+    const result: CatItem[] = []
+
+    for (const key of TOP_CATS) {
+      if (topCounts[key] && topCounts[key] > 0) {
         result.push({
           category:      key,
-          session_count: mainCounts[key],
-          pct:           Math.round((mainCounts[key] / total) * 100),
+          session_count: topCounts[key],
+          pct:           Math.round((topCounts[key] / grandTotal) * 100),
         })
       }
     }
 
-    // Other always last
-    if (otherTotal > 0) {
-      const subs = Object.entries(subCounts)
-        .map(([k, count]) => ({
-          category:      k,
-          session_count: count,
-          pct:           Math.round((count / otherTotal) * 100),
+    if (innerTotal > 0) {
+      const children = Object.entries(innerCounts)
+        .filter(([, n]) => n > 0)
+        .map(([category, session_count]) => ({
+          category,
+          session_count,
         }))
         .sort((a, b) => b.session_count - a.session_count)
+
       result.push({
         category:      'other',
-        session_count: otherTotal,
-        pct:           Math.round((otherTotal / total) * 100),
-        sub:           subs.length > 0 ? subs : undefined,
+        session_count: innerTotal,
+        pct:           Math.round((innerTotal / grandTotal) * 100),
+        children,
       })
     }
 
@@ -476,14 +486,14 @@ export default function OrgOverview() {
                           <div key={c.category}>
                             <div
                               className="cat-row"
-                              style={{ cursor: c.sub ? 'pointer' : 'default' }}
-                              onClick={() => { if (c.sub) setOtherExpanded(e => !e) }}
+                              style={{ cursor: c.children ? 'pointer' : 'default' }}
+                              onClick={() => { if (c.children) setOtherExpanded(e => !e) }}
                             >
                               <div className="cat-meta">
                                 <div className="cat-label-wrap">
                                   <div className="cat-dot" style={{ background: color }} />
                                   {fmtCat(c.category)}
-                                  {c.sub && (
+                                  {c.children && (
                                     <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--gray-400)' }}>
                                       {otherExpanded ? '▲' : '▼'}
                                     </span>
@@ -501,7 +511,7 @@ export default function OrgOverview() {
                               </div>
                             </div>
 
-                            {c.sub && otherExpanded && (
+                            {c.children && otherExpanded && (
                               <div style={{
                                 marginLeft:   16,
                                 marginBottom: 8,
@@ -509,7 +519,7 @@ export default function OrgOverview() {
                                 paddingBottom: 4,
                                 borderLeft:   '2px solid var(--gray-200)',
                               }}>
-                                {c.sub.map((s, si) => (
+                                {c.children.map((s, si) => (
                                   <div
                                     key={s.category}
                                     style={{
@@ -517,7 +527,7 @@ export default function OrgOverview() {
                                       justifyContent: 'space-between',
                                       alignItems:     'center',
                                       padding:        '4px 0',
-                                      borderBottom:   si < c.sub!.length - 1
+                                      borderBottom:   si < c.children!.length - 1
                                         ? '1px solid var(--gray-100)'
                                         : 'none',
                                     }}
