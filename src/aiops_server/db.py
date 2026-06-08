@@ -47,6 +47,16 @@ async def _run_startup_migrations() -> None:
         )
 
 
+def get_pool() -> asyncpg.Pool:
+    """Return the initialized connection pool.
+
+    Used by startup tasks that need a connection outside the request lifecycle
+    (e.g. the category backfill in main.py). init_pool() must have run first.
+    """
+    assert _pool is not None, "connection pool not initialized"
+    return _pool
+
+
 async def close_pool() -> None:
     global _pool
     if _pool:
