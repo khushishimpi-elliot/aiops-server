@@ -11,7 +11,7 @@ import { readLastLines, logFilePath } from './core/logger.js';
 import { runAnalysis } from './core/analyst.js';
 import { startServer } from './core/server.js';
 import { PATHS } from './core/paths.js';
-import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats } from './core/db.js';
+import { openDb, upsertSessions, getDailyTotals, getWeeklyTotals, getBudgets, setBudget, isAvailable as dbAvailable, dbPath, getRecentScans, getHistoricalSummary, getDbStats, getSessionsSince } from './core/db.js';
 import { saveConfig, getMachineId, isEnrolled, loadConfig as _loadConfig } from './core/config.js';
 import { syncToServer } from './core/syncer.js';
 import { startDaemon, isDaemonAlive, stopDaemon, readDaemonPid, LOG_FILE as DAEMON_LOG } from './core/daemon.js';
@@ -257,22 +257,32 @@ async function cmdScan(opts: { json?: boolean } = {}): Promise<void> {
   openDb();
   const t0 = Date.now();
   const nowMs = Date.now();
-  const cutoff28 = nowMs - 365 * 86400000; // Show all-time data to match server dashboard
   const todayStr = today();
 
-  // 1. Run all adapters — deduplicate by (sessionId, tool) to match DB count
-  const results = runAllAdapters();
-  const _raw = results.flatMap(r => r.sessions);
+  // Use database to match server — live scan only has recent sessions
+  // in memory. Database has all accumulated synced data which is the source of truth.
+  let allSessions: SessionRecord[] = [];
+  const results = runAllAdapters(); // Get tool info for TOOLS DETECTED section
+
+  try {
+    // Try database first (has all synced data) for token counts
+    allSessions = getSessionsSince(3650);
+  } catch {
+    // Fall back to live scan if database unavailable
+    allSessions = results.flatMap(r => r.sessions);
+  }
+
+  // Deduplicate by (sessionId, tool)
   const _seen = new Set<string>();
-  const allSessions = _raw.filter(s => {
+  allSessions = allSessions.filter(s => {
     const key = `${s.sessionId}|${s.tool}`;
     if (_seen.has(key)) return false;
     _seen.add(key);
     return true;
   });
 
-  // 2. Sessions in last 28 days
-  const recent = allSessions.filter(s => !s.sessionTimestamp || s.sessionTimestamp >= cutoff28);
+  // Show all-time data to match server
+  const recent = allSessions;
 
   if (allSessions.length === 0) {
     console.log();

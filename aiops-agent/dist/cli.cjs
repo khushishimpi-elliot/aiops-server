@@ -15939,18 +15939,22 @@ async function cmdScan(opts = {}) {
   openDb();
   const t0 = Date.now();
   const nowMs = Date.now();
-  const cutoff28 = nowMs - 365 * 864e5;
   const todayStr = today();
+  let allSessions = [];
   const results = runAllAdapters();
-  const _raw = results.flatMap((r) => r.sessions);
+  try {
+    allSessions = getSessionsSince(3650);
+  } catch {
+    allSessions = results.flatMap((r) => r.sessions);
+  }
   const _seen = /* @__PURE__ */ new Set();
-  const allSessions = _raw.filter((s) => {
+  allSessions = allSessions.filter((s) => {
     const key = `${s.sessionId}|${s.tool}`;
     if (_seen.has(key)) return false;
     _seen.add(key);
     return true;
   });
-  const recent = allSessions.filter((s) => !s.sessionTimestamp || s.sessionTimestamp >= cutoff28);
+  const recent = allSessions;
   if (allSessions.length === 0) {
     console.log();
     console.log(source_default.yellow("  No AI tool sessions found on this machine."));
