@@ -154,6 +154,21 @@ function isActive(lastActive: string | null): boolean {
   return Math.abs(dayDiffMs) < sevenDaysMs
 }
 
+// Compact "time since the agent last contacted the server" for the Last Active
+// cell — lets you tell an inactive developer from an offline agent.
+function lastSeenLabel(iso: string | null): { text: string; online: boolean } {
+  if (!iso) return { text: 'agent never connected', online: false }
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const online = diffMs < 30 * 60 * 1000          // synced within 30 min
+  const mins = Math.round(diffMs / 60000)
+  let when: string
+  if (mins < 1)        when = 'just now'
+  else if (mins < 60)  when = `${mins}m ago`
+  else if (mins < 1440) when = `${Math.round(mins / 60)}h ago`
+  else                 when = `${Math.round(mins / 1440)}d ago`
+  return { text: `agent ${when}`, online }
+}
+
 
 const WEEKLY_BUDGET_MC  = 15_000 * 100
 const MONTHLY_BUDGET_MC = 50_000 * 100
@@ -813,7 +828,16 @@ export default function DeveloperList() {
                         </span>
                       </td>
                       <td style={{ color: 'var(--gray-500)', fontSize: 12 }}>
-                        {dev.last_active ? new Date(dev.last_active).toLocaleDateString() : '—'}
+                        <div>{dev.last_active ? new Date(dev.last_active).toLocaleDateString() : '—'}</div>
+                        {(() => {
+                          const s = lastSeenLabel(dev.last_seen_at)
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, fontSize: 10, color: s.online ? '#16a34a' : 'var(--gray-400)' }}>
+                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.online ? '#16a34a' : '#cbd5e1', flexShrink: 0 }} />
+                              {s.text}
+                            </div>
+                          )
+                        })()}
                       </td>
                     </tr>
                   )

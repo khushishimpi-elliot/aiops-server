@@ -43,6 +43,7 @@ export interface DevSummaryItem {
   total_input_tokens: number
   total_output_tokens: number
   last_active: string | null
+  last_seen_at: string | null
   active_devices: number
 }
 

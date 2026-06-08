@@ -168,6 +168,7 @@ class DevSummaryItem(BaseModel):
     total_input_tokens: int
     total_output_tokens: int
     last_active: date | None   # most recent day of actual usage (usage.date), not upload time
+    last_seen_at: datetime | None = None  # most recent time the agent contacted the server
     active_devices: int
 
 

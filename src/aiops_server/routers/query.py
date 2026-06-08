@@ -51,6 +51,10 @@ async def list_developers(
             -- selected window. Clamp to CURRENT_DATE to handle timezone-related
             -- date discrepancies that may push dates into the future.
             LEAST((SELECT MAX(us2.date) FROM usage us2 WHERE us2.user_id = u.id), CURRENT_DATE) AS last_active,
+            -- Last time ANY of the developer's devices contacted the server.
+            -- Lets the dashboard tell "hasn't used AI lately" (old last_active
+            -- but recent last_seen) apart from "agent offline" (both old).
+            d.last_seen_at                                 AS last_seen_at,
             COALESCE(d.active_devices, 0)::int             AS active_devices
         FROM   users u
         LEFT JOIN (
@@ -63,9 +67,10 @@ async def list_developers(
             GROUP  BY user_id
         ) us ON us.user_id = u.id
         LEFT JOIN (
-            SELECT user_id, COUNT(*)::int AS active_devices
+            SELECT user_id,
+                   COUNT(*) FILTER (WHERE status = 'active')::int AS active_devices,
+                   MAX(last_seen_at)                              AS last_seen_at
             FROM   devices
-            WHERE  status = 'active'
             GROUP  BY user_id
         ) d ON d.user_id = u.id
         WHERE  u.deleted_at IS NULL
@@ -84,6 +89,7 @@ async def list_developers(
                 total_input_tokens=r["total_input_tokens"],
                 total_output_tokens=r["total_output_tokens"],
                 last_active=r["last_active"],
+                last_seen_at=r["last_seen_at"],
                 active_devices=r["active_devices"] or 0,
             )
             for r in rows
