@@ -179,8 +179,8 @@ function lastSeenLabel(iso: string | null): { text: string; online: boolean } {
 const WEEKLY_BUDGET_MC  = 15_000 * 100
 const MONTHLY_BUDGET_MC = 50_000 * 100
 
-function DevDrawer({ email, colorIdx, days, onClose }: {
-  email: string; colorIdx: number; days: number; onClose: () => void
+function DevDrawer({ email, colorIdx, onClose }: {
+  email: string; colorIdx: number; onClose: () => void
 }) {
   const [data, setData] = useState<DevDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -191,8 +191,12 @@ function DevDrawer({ email, colorIdx, days, onClose }: {
 
   useEffect(() => {
     setLoading(true); setData(null); setBreakdownExpanded(false); setModelsExpanded(false); setOtherExpanded(false); setToolsExpanded(false)
-    api.developer(email, days).then(setData).catch(() => {}).finally(() => setLoading(false))
-  }, [email, days])
+    // Always pull a full year for the drawer so its Tools Detected, totals, and
+    // Today/Week/Month/Year breakdown are complete and match `aiops scan`
+    // (which reports all-time). The list page's shorter window would otherwise
+    // hide older tools/sessions — e.g. Copilot usage from months ago.
+    api.developer(email, 365).then(setData).catch(() => {}).finally(() => setLoading(false))
+  }, [email])
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -855,7 +859,7 @@ export default function DeveloperList() {
       </div>
 
       {drawerEmail && (
-        <DevDrawer email={drawerEmail} colorIdx={drawerColorIdx} days={days} onClose={closeDrawer} />
+        <DevDrawer email={drawerEmail} colorIdx={drawerColorIdx} onClose={closeDrawer} />
       )}
     </>
   )
