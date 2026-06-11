@@ -217,6 +217,7 @@ class OrgOverviewResponse(BaseModel):
     total_cost_millicents: int
     total_input_tokens: int
     total_output_tokens: int
+    total_cache_tokens: int = 0
     active_developers: int
     by_tool_model: list[ToolModelBreakdown]
     task_categories: list[TaskCategoryItem]

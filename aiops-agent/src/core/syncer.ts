@@ -97,6 +97,19 @@ export async function syncToServer(
       });
 
       if (res.ok) {
+        const totalSessions = aggregates.reduce((s, a) => s + a.sessions, 0);
+        const totalCost = aggregates.reduce((s, a) => s + a.cost_usd, 0);
+        const totalInput = aggregates.reduce((s, a) => s + a.input_tokens, 0);
+        const totalOutput = aggregates.reduce((s, a) => s + a.output_tokens, 0);
+        const totalCache = aggregates.reduce((s, a) => s + a.cache_tokens, 0);
+
+        console.log(
+          '  Sent to server:',
+          totalSessions, 'sessions',
+          '| $' + totalCost.toFixed(3),
+          '| tokens:', totalInput + totalOutput + totalCache
+        );
+
         return {
           success:        true,
           aggregatesSent: aggregates.length,

@@ -312,6 +312,21 @@ export default function OrgOverview() {
               <div className="stat-card">
                 <div className="stat-top">
                   <div>
+                    <div className="stat-label">Cache Tokens</div>
+                    <div className="stat-value">{formatTokens(data.total_cache_tokens)}</div>
+                  </div>
+                  <div className="stat-icon orange-bg">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div className="stat-meta">Cached for reuse</div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-top">
+                  <div>
                     <div className="stat-label">Active Developers</div>
                     <div className="stat-value">{data.active_developers}</div>
                   </div>

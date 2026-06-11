@@ -28,6 +28,7 @@ export interface OrgOverviewResponse {
   total_cost_millicents: number
   total_input_tokens: number
   total_output_tokens: number
+  total_cache_tokens: number
   active_developers: number
   by_tool_model: ToolModelBreakdown[]
   task_categories: TaskCategoryItem[]
