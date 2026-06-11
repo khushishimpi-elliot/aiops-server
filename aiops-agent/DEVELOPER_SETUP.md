@@ -1,6 +1,8 @@
 # Quick Setup for Developers
 
-## TL;DR — Just Run This
+## TL;DR — Pick One Method Below
+
+### Method 1: Standard Setup (Recommended)
 
 **macOS / Linux:**
 ```bash
@@ -16,7 +18,34 @@ cd aiops-agent
 .\setup.bat
 ```
 
-Then verify:
+### Method 2: Local Installation (If Method 1 Fails)
+
+This installs to your home directory without needing npm global permissions.
+
+**macOS / Linux:**
+```bash
+cd aiops-agent
+bash install-local.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+cd aiops-agent
+.\install-local.bat
+```
+
+### Method 3: Direct Use (No Installation)
+
+Just use the binary directly without installing:
+
+```bash
+node dist/cli.cjs --version
+node dist/cli.cjs                # Run scan
+```
+
+---
+
+Then verify installation:
 ```bash
 aiops --version    # Should print: 1.0.0
 aiops              # Should scan and show your AI tool usage
@@ -27,26 +56,44 @@ aiops              # Should scan and show your AI tool usage
 ## What If Setup Fails?
 
 ### `esbuild: Exec format error`
-This means platform-specific binaries are incompatible (you cloned on macOS but installed on Windows, etc.).
+Platform-specific binary mismatch. Try the local install instead:
 
-**Quick fix:**
+**macOS / Linux:**
 ```bash
-rm -rf node_modules package-lock.json
-bash setup.sh        # macOS / Linux
-setup.bat            # Windows
+bash install-local.sh
+```
+
+**Windows:**
+```powershell
+.\install-local.bat
 ```
 
 ### `aiops: command not found`
-The global install didn't work. Try:
+Global npm install didn't work. Use **Method 2** above (local installation):
 
 ```bash
-# Reinstall globally
-npm install -g . --force
-
-# Verify it's installed
-which aiops          # macOS / Linux
-where aiops          # Windows PowerShell
+bash install-local.sh           # macOS / Linux
+# OR
+.\install-local.bat             # Windows
 ```
+
+Or just use the binary directly:
+```bash
+node dist/cli.cjs --version
+node dist/cli.cjs
+```
+
+### Run Diagnostic
+Check what's wrong with:
+```bash
+node diagnose.js
+```
+
+This shows:
+- Your Node.js version
+- npm configuration
+- WHERE the binary is (or should be)
+- Why the command might not be found
 
 ### Other Issues?
 See **SETUP_TROUBLESHOOTING.md** in the project root for detailed solutions.
