@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "mkdir -p dist && npx esbuild src/cli.ts --bundle --platform=node --target=node18 --external:better-sqlite3 --external:fsevents --format=cjs --define:import.meta.url=__filename --outfile=dist/cli.cjs && node -e \"if(process.platform!=='win32')require('fs').chmodSync('dist/cli.cjs',0o755)\"",
-    "watch": "mkdir -p dist && npx esbuild src/cli.ts --bundle --watch --platform=node --target=node18 --external:better-sqlite3 --external:fsevents --format=cjs --define:import.meta.url=__filename --outfile=dist/cli.cjs",
+    "watch": "npx esbuild src/cli.ts --bundle --watch --platform=node --target=node18 --external:better-sqlite3 --external:fsevents --format=cjs --define:import.meta.url=__filename --outfile=dist/cli.cjs",
     "dev": "node dist/cli.cjs",
     "start": "node dist/cli.js",
     "postinstall": "npm run build"
