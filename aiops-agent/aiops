@@ -1,0 +1,6 @@
+#!/bin/bash
+# AIOps wrapper — works from anywhere, no PATH/global install needed
+# Just copy this file to /usr/local/bin/aiops and chmod +x it
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+node "$SCRIPT_DIR/dist/cli.cjs" "$@"
