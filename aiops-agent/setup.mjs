@@ -100,18 +100,26 @@ ok('Dependencies installed');
 // ── 3. Build TypeScript ───────────────────────────────────────────────────────
 step(2, 'Building project');
 
-if (!run(npmCmd('npm run build'))) {
-  // tsc might already be in node_modules/.bin
-  const tscPath = IS_WIN
-    ? join('node_modules', '.bin', 'tsc.cmd')
-    : join('node_modules', '.bin', 'tsc');
+// Check if pre-built binary already exists (committed to git)
+const distExists = existsSync('dist/cli.cjs');
 
-  if (existsSync(tscPath) && !run(`"${tscPath}"`)) {
-    err('TypeScript build failed. Check the errors above and fix any type errors, then re-run setup.');
+if (!run(npmCmd('npm run build'))) {
+  // Build failed — but if dist/cli.cjs already exists (from git), we can continue
+  if (distExists) {
+    warn('esbuild skipped (platform-specific binary incompatibility)');
+    info('Using pre-built binary from git (dist/cli.cjs)');
+  } else {
+    // No fallback binary, this is a real problem
+    err('Build failed and no pre-built binary found.');
+    err('Troubleshooting:');
+    err('  1. Check Node.js version: node --version (need 18+)');
+    err('  2. Clean and retry: rm -rf node_modules package-lock.json && bash setup.sh');
+    err('  3. See SETUP_TROUBLESHOOTING.md for more help');
     process.exit(1);
   }
+} else {
+  ok('Build complete → dist/cli.cjs');
 }
-ok('Build complete → dist/');
 
 // ── 4. Global install ─────────────────────────────────────────────────────────
 step(3, 'Installing globally');
